@@ -35,7 +35,7 @@
 1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
 2. 左侧菜单 → **Workers & Pages** → **KV**
 3. 点击 **Create a namespace**
-4. 名称填写 `SUBSCRIPTIONS_KV`（或任意你喜欢的名字），点击 **Add**
+4. 名称填写 `Track`（或任意你喜欢的名字），点击 **Add**
 
 **步骤 2：创建 Worker**
 1. 左侧菜单 → **Workers & Pages** → **Create application** → **Create Worker**
@@ -48,7 +48,7 @@
 1. 回到 Worker 页面，点击 **Settings** 标签
 2. 找到 **Variables** 区域
 3. 在 **KV Namespace Bindings** 下点击 **Add binding**
-   - Variable name：`SUBSCRIPTIONS_KV`（必须完全一致）
+   - Variable name：`Track`（必须完全一致）
    - KV namespace：选择你刚才创建的 KV 命名空间
 4. 点击 **Save** 保存
 
@@ -85,7 +85,7 @@ compatibility_flags = ["nodejs_compat"]
 
 # KV 命名空间（第一次部署请先运行下面的创建命令）
 [[kv_namespaces]]
-binding = "SUBSCRIPTIONS_KV"
+binding = "Track"
 id = "运行创建命令后这里会自动填充"
 
 # 每小时定时检查
@@ -95,7 +95,7 @@ crons = ["0 * * * *"]
 
 4. 创建 KV 命名空间：
 ```bash
-wrangler kv:namespace create SUBSCRIPTIONS_KV
+wrangler kv:namespace create Track
 ```
 将输出的 `id` 填入 `wrangler.toml` 对应位置。
 
