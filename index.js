@@ -15,7 +15,7 @@ var __export = (target, all) => {
 
 // src/data/kv.js
 async function getKVJson(env, key, defaultValue = null) {
-  const raw2 = await env.SUBSCRIPTIONS_KV.get(key);
+  const raw2 = await env.Track.get(key);
   if (!raw2) return defaultValue;
   try {
     return JSON.parse(raw2);
@@ -25,7 +25,7 @@ async function getKVJson(env, key, defaultValue = null) {
   }
 }
 async function putKVJson(env, key, value) {
-  await env.SUBSCRIPTIONS_KV.put(key, JSON.stringify(value));
+  await env.Track.put(key, JSON.stringify(value));
 }
 var init_kv = __esm({
   "src/data/kv.js"() {
@@ -35,11 +35,11 @@ var init_kv = __esm({
 
 // src/data/config.js
 async function getConfig(env) {
-  if (!env.SUBSCRIPTIONS_KV) {
+  if (!env.Track) {
     console.error("[\u914D\u7F6E] KV\u5B58\u50A8\u672A\u7ED1\u5B9A");
     throw new Error("KV\u5B58\u50A8\u672A\u7ED1\u5B9A");
   }
-  const data = await env.SUBSCRIPTIONS_KV.get("config");
+  const data = await env.Track.get("config");
   console.log("[\u914D\u7F6E] \u4ECEKV\u8BFB\u53D6\u914D\u7F6E:", data ? "\u6210\u529F" : "\u7A7A\u914D\u7F6E");
   const config = data ? JSON.parse(data) : {};
   let jwtSecret = config.JWT_SECRET;
@@ -47,7 +47,7 @@ async function getConfig(env) {
     console.log("[\u914D\u7F6E] \u751F\u6210\u65B0\u7684JWT\u5BC6\u94A5");
     jwtSecret = crypto.randomUUID();
     const updatedConfig = { ...config, JWT_SECRET: jwtSecret };
-    await env.SUBSCRIPTIONS_KV.put("config", JSON.stringify(updatedConfig));
+    await env.Track.put("config", JSON.stringify(updatedConfig));
   }
   return {
     ...DEFAULT_CONFIG,
@@ -1089,7 +1089,7 @@ var init_reminder = __esm({
 
 // src/data/subscriptions.repo.js
 async function listIds(env) {
-  const raw2 = await env.SUBSCRIPTIONS_KV.get(KEY_INDEX);
+  const raw2 = await env.Track.get(KEY_INDEX);
   if (!raw2) return [];
   try {
     const parsed = JSON.parse(raw2);
@@ -1107,11 +1107,11 @@ async function writeIds(env, ids) {
       deduped.push(id);
     }
   }
-  await env.SUBSCRIPTIONS_KV.put(KEY_INDEX, JSON.stringify(deduped));
+  await env.Track.put(KEY_INDEX, JSON.stringify(deduped));
 }
 async function getById(env, id) {
   if (!id) return null;
-  const raw2 = await env.SUBSCRIPTIONS_KV.get(KEY_PREFIX + id);
+  const raw2 = await env.Track.get(KEY_PREFIX + id);
   if (!raw2) return null;
   try {
     return JSON.parse(raw2);
@@ -1130,7 +1130,7 @@ async function save(env, subscription) {
   if (!subscription || typeof subscription.id !== "string" || subscription.id === "") {
     throw new Error("\u8BA2\u9605\u7F3A\u5C11\u6709\u6548 id");
   }
-  await env.SUBSCRIPTIONS_KV.put(
+  await env.Track.put(
     KEY_PREFIX + subscription.id,
     JSON.stringify(subscription)
   );
@@ -1144,7 +1144,7 @@ async function save(env, subscription) {
 async function saveMany(env, subs) {
   if (!Array.isArray(subs) || subs.length === 0) return;
   await Promise.all(
-    subs.map((s) => env.SUBSCRIPTIONS_KV.put(KEY_PREFIX + s.id, JSON.stringify(s)))
+    subs.map((s) => env.Track.put(KEY_PREFIX + s.id, JSON.stringify(s)))
   );
   const idsExisting = await listIds(env);
   const set = new Set(idsExisting);
@@ -1157,7 +1157,7 @@ async function saveMany(env, subs) {
 }
 async function deleteById(env, id) {
   if (!id) return false;
-  const before = await env.SUBSCRIPTIONS_KV.get(KEY_PREFIX + id);
+  const before = await env.Track.get(KEY_PREFIX + id);
   if (!before) {
     const ids2 = await listIds(env);
     if (ids2.includes(id)) {
@@ -1165,7 +1165,7 @@ async function deleteById(env, id) {
     }
     return false;
   }
-  await env.SUBSCRIPTIONS_KV.delete(KEY_PREFIX + id);
+  await env.Track.delete(KEY_PREFIX + id);
   const ids = await listIds(env);
   if (ids.includes(id)) {
     await writeIds(env, ids.filter((x) => x !== id));
@@ -1175,12 +1175,12 @@ async function deleteById(env, id) {
 async function replaceAll(env, subs) {
   const oldIds = await listIds(env);
   await Promise.all(
-    oldIds.map((id) => env.SUBSCRIPTIONS_KV.delete(KEY_PREFIX + id))
+    oldIds.map((id) => env.Track.delete(KEY_PREFIX + id))
   );
   if (Array.isArray(subs) && subs.length > 0) {
     await Promise.all(
       subs.map(
-        (s) => env.SUBSCRIPTIONS_KV.put(KEY_PREFIX + s.id, JSON.stringify(s))
+        (s) => env.Track.put(KEY_PREFIX + s.id, JSON.stringify(s))
       )
     );
     await writeIds(env, subs.map((s) => s.id));
@@ -1286,7 +1286,7 @@ function normalizeRule(raw2) {
   };
 }
 async function listForSubscription(env, subId) {
-  const raw2 = await env.SUBSCRIPTIONS_KV.get(KEY_PREFIX2 + subId);
+  const raw2 = await env.Track.get(KEY_PREFIX2 + subId);
   if (!raw2) return [];
   try {
     const parsed = JSON.parse(raw2);
@@ -1298,7 +1298,7 @@ async function listForSubscription(env, subId) {
 }
 async function replaceForSubscription(env, subId, rules) {
   const safe = Array.isArray(rules) ? rules.map(normalizeRule) : [];
-  await env.SUBSCRIPTIONS_KV.put(KEY_PREFIX2 + subId, JSON.stringify(safe));
+  await env.Track.put(KEY_PREFIX2 + subId, JSON.stringify(safe));
 }
 async function addRule(env, subId, rule) {
   const list = await listForSubscription(env, subId);
@@ -1323,7 +1323,7 @@ async function deleteRule(env, subId, ruleId) {
   return true;
 }
 async function clearForSubscription(env, subId) {
-  await env.SUBSCRIPTIONS_KV.delete(KEY_PREFIX2 + subId);
+  await env.Track.delete(KEY_PREFIX2 + subId);
 }
 function deriveLegacyFromRules(rules) {
   const list = Array.isArray(rules) ? rules.filter((r) => r && r.isEnabled !== false) : [];
@@ -1867,7 +1867,7 @@ async function writeLog(env, entry, opts = {}) {
     reason: entry.reason,
     extra: entry.extra
   };
-  await env.SUBSCRIPTIONS_KV.put(key, JSON.stringify(stored), {
+  await env.Track.put(key, JSON.stringify(stored), {
     expirationTtl: Math.max(60, opts.ttlSec || DEFAULT_TTL_SEC)
   });
   return { key, ...stored };
@@ -1877,7 +1877,7 @@ async function getRecent(env, limit = 20) {
   const allKeys = [];
   let cursor;
   do {
-    const res = await env.SUBSCRIPTIONS_KV.list({
+    const res = await env.Track.list({
       prefix: PREFIX,
       cursor,
       limit: 1e3
@@ -1889,7 +1889,7 @@ async function getRecent(env, limit = 20) {
   const top = allKeys.slice(0, safeLimit);
   const items = await Promise.all(
     top.map(async (key) => {
-      const raw2 = await env.SUBSCRIPTIONS_KV.get(key);
+      const raw2 = await env.Track.get(key);
       if (!raw2) return null;
       try {
         return { key, ...JSON.parse(raw2) };
@@ -1937,7 +1937,7 @@ async function writeLog2(env, entry) {
     error: entry.error,
     raw: entry.raw
   };
-  await env.SUBSCRIPTIONS_KV.put(key, JSON.stringify(stored), {
+  await env.Track.put(key, JSON.stringify(stored), {
     expirationTtl: Math.max(60, entry.ttlSec || DEFAULT_TTL_SEC2)
   });
   return { key, ...stored };
@@ -1947,7 +1947,7 @@ async function query(env, filter = {}) {
   const all = [];
   let cursor;
   do {
-    const res = await env.SUBSCRIPTIONS_KV.list({
+    const res = await env.Track.list({
       prefix: PREFIX2,
       cursor,
       limit: 1e3
@@ -1961,7 +1961,7 @@ async function query(env, filter = {}) {
   const out = [];
   for (const key of all) {
     if (out.length >= limit) break;
-    const raw2 = await env.SUBSCRIPTIONS_KV.get(key);
+    const raw2 = await env.Track.get(key);
     if (!raw2) continue;
     try {
       const obj = JSON.parse(raw2);
@@ -4620,19 +4620,19 @@ var MAX_LOGIN_ATTEMPTS = 5;
 var LOCKOUT_SECONDS = 300;
 async function checkRateLimit(env, ip) {
   const key = `login_attempts:${ip}`;
-  const raw2 = await env.SUBSCRIPTIONS_KV.get(key);
+  const raw2 = await env.Track.get(key);
   const attempts = raw2 ? parseInt(raw2, 10) : 0;
   return attempts >= MAX_LOGIN_ATTEMPTS;
 }
 async function recordFailedAttempt(env, ip) {
   const key = `login_attempts:${ip}`;
-  const raw2 = await env.SUBSCRIPTIONS_KV.get(key);
+  const raw2 = await env.Track.get(key);
   const attempts = (raw2 ? parseInt(raw2, 10) : 0) + 1;
-  await env.SUBSCRIPTIONS_KV.put(key, String(attempts), { expirationTtl: LOCKOUT_SECONDS });
+  await env.Track.put(key, String(attempts), { expirationTtl: LOCKOUT_SECONDS });
   return attempts;
 }
 async function clearAttempts(env, ip) {
-  await env.SUBSCRIPTIONS_KV.delete(`login_attempts:${ip}`);
+  await env.Track.delete(`login_attempts:${ip}`);
 }
 async function handleLogin(request, env) {
   const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "unknown";
@@ -4713,7 +4713,7 @@ async function getDynamicRates(env) {
   const CACHE_KEY = "SYSTEM_EXCHANGE_RATES";
   const CACHE_TTL = 864e5;
   try {
-    const cached = await env.SUBSCRIPTIONS_KV.get(CACHE_KEY, { type: "json" });
+    const cached = await env.Track.get(CACHE_KEY, { type: "json" });
     if (cached && cached.ts && Date.now() - cached.ts < CACHE_TTL) {
       return cached.rates;
     }
@@ -4725,7 +4725,7 @@ async function getDynamicRates(env) {
         ...data.rates,
         "CNY": 1
       };
-      await env.SUBSCRIPTIONS_KV.put(CACHE_KEY, JSON.stringify({
+      await env.Track.put(CACHE_KEY, JSON.stringify({
         ts: Date.now(),
         rates: newRates
       }));
@@ -13264,7 +13264,7 @@ async function handleDebug(request, env) {
     const debugInfo = {
       timestamp: now.utc.toISOString(),
       pathname: url.pathname,
-      kvBinding: !!env.SUBSCRIPTIONS_KV,
+      kvBinding: !!env.Track,
       configExists: !!config,
       adminUsername: config.ADMIN_USERNAME,
       hasJwtSecret: !!config.JWT_SECRET,
@@ -13377,7 +13377,7 @@ async function ensureMigrations(env) {
   if (cachedSchemaVersion === SCHEMA_VERSION) {
     return { migrated: false, reason: "cached" };
   }
-  const current = await env.SUBSCRIPTIONS_KV.get(KEY_SCHEMA_VERSION);
+  const current = await env.Track.get(KEY_SCHEMA_VERSION);
   if (current === SCHEMA_VERSION) {
     cachedSchemaVersion = SCHEMA_VERSION;
     return { migrated: false, reason: "already_v3" };
@@ -13389,15 +13389,15 @@ async function ensureMigrations(env) {
   const ranSteps = [];
   try {
     for (const step of MIGRATION_STEPS) {
-      const doneFlag = await env.SUBSCRIPTIONS_KV.get(`migrate:${step.id}`);
+      const doneFlag = await env.Track.get(`migrate:${step.id}`);
       if (doneFlag === "done") continue;
       console.log(`[migrate] \u5F00\u59CB\u6267\u884C: ${step.id} - ${step.description}`);
       await step.run(env);
-      await env.SUBSCRIPTIONS_KV.put(`migrate:${step.id}`, "done");
+      await env.Track.put(`migrate:${step.id}`, "done");
       console.log(`[migrate] \u5B8C\u6210: ${step.id}`);
       ranSteps.push(step.id);
     }
-    await env.SUBSCRIPTIONS_KV.put(KEY_SCHEMA_VERSION, SCHEMA_VERSION);
+    await env.Track.put(KEY_SCHEMA_VERSION, SCHEMA_VERSION);
     cachedSchemaVersion = SCHEMA_VERSION;
     return { migrated: true, ranSteps };
   } catch (err) {
@@ -13408,22 +13408,22 @@ async function ensureMigrations(env) {
   }
 }
 async function tryAcquireLock(env) {
-  const existing = await env.SUBSCRIPTIONS_KV.get(KEY_MIGRATION_LOCK);
+  const existing = await env.Track.get(KEY_MIGRATION_LOCK);
   if (existing) return false;
-  await env.SUBSCRIPTIONS_KV.put(KEY_MIGRATION_LOCK, (/* @__PURE__ */ new Date()).toISOString(), {
+  await env.Track.put(KEY_MIGRATION_LOCK, (/* @__PURE__ */ new Date()).toISOString(), {
     expirationTtl: LOCK_TTL_SEC
   });
   return true;
 }
 async function releaseLock(env) {
   try {
-    await env.SUBSCRIPTIONS_KV.delete(KEY_MIGRATION_LOCK);
+    await env.Track.delete(KEY_MIGRATION_LOCK);
   } catch (err) {
     console.warn("[migrate] \u91CA\u653E\u9501\u5931\u8D25\uFF08TTL 60s \u540E\u4F1A\u81EA\u52A8\u91CA\u653E\uFF09:", err);
   }
 }
 async function migrateSubscriptions(env) {
-  const oldRaw = await env.SUBSCRIPTIONS_KV.get("subscriptions");
+  const oldRaw = await env.Track.get("subscriptions");
   let oldSubs = [];
   if (oldRaw) {
     try {
@@ -13439,14 +13439,14 @@ async function migrateSubscriptions(env) {
   } else {
     const existing = await listIds(env);
     if (existing.length === 0) {
-      await env.SUBSCRIPTIONS_KV.put("sub_index", "[]");
+      await env.Track.put("sub_index", "[]");
     }
   }
   if (oldRaw) {
-    await env.SUBSCRIPTIONS_KV.put("subscriptions_v2_backup", oldRaw, {
+    await env.Track.put("subscriptions_v2_backup", oldRaw, {
       expirationTtl: BACKUP_TTL_SEC
     });
-    await env.SUBSCRIPTIONS_KV.delete("subscriptions");
+    await env.Track.delete("subscriptions");
   }
   console.log(`[migrate:subscriptions_v3] \u5DF2\u8FC1\u79FB ${oldSubs.length} \u6761\u8BA2\u9605`);
 }
@@ -13463,7 +13463,7 @@ async function migrateReminderRules(env) {
   console.log(`[migrate:reminder_rules_v3] \u5DF2\u4E3A ${count} \u4E2A\u8BA2\u9605\u751F\u6210\u9ED8\u8BA4\u63D0\u9192\u89C4\u5219`);
 }
 async function migrateSchedulerLogs(env) {
-  const histRaw = await env.SUBSCRIPTIONS_KV.get("scheduler_status_history");
+  const histRaw = await env.Track.get("scheduler_status_history");
   if (!histRaw) return;
   let history = [];
   try {
@@ -13667,10 +13667,10 @@ function buildDedupeBucket(rule, nowParts) {
   return isDayRule ? ymd : `${ymd}${nowParts.hourString}`;
 }
 async function readLastFireAt(env, subId, ruleId) {
-  return env.SUBSCRIPTIONS_KV.get(`notify_lastfire:${subId}:${ruleId}`);
+  return env.Track.get(`notify_lastfire:${subId}:${ruleId}`);
 }
 async function writeLastFireAt(env, subId, ruleId, iso) {
-  await env.SUBSCRIPTIONS_KV.put(`notify_lastfire:${subId}:${ruleId}`, iso, {
+  await env.Track.put(`notify_lastfire:${subId}:${ruleId}`, iso, {
     expirationTtl: LAST_FIRE_TTL_SEC
   });
 }
@@ -13765,7 +13765,7 @@ async function checkExpiringSubscriptions(env) {
     for (const c of candidates) {
       const bucket = buildDedupeBucket(c.rule, nowParts);
       const dedupeKey = `notify_dedupe:${c.sub.id}:${c.rule.id}:${bucket}`;
-      const exists = await env.SUBSCRIPTIONS_KV.get(dedupeKey);
+      const exists = await env.Track.get(dedupeKey);
       if (exists) {
         dedupedCount++;
         continue;
@@ -13820,7 +13820,7 @@ async function checkExpiringSubscriptions(env) {
       const firedAt = now.utc.toISOString();
       await Promise.all(
         ready.map(async (c) => {
-          await env.SUBSCRIPTIONS_KV.put(c.dedupeKey, "1", { expirationTtl: DEDUPE_TTL_SEC });
+          await env.Track.put(c.dedupeKey, "1", { expirationTtl: DEDUPE_TTL_SEC });
           if (c.rule.type === "after_expiry") {
             await writeLastFireAt(env, c.sub.id, c.rule.id, firedAt);
           }
@@ -13949,7 +13949,7 @@ var index_default = {
    * 每小时由 Cron 触发一次。
    *
    * @param {ScheduledEvent} event
-   * @param {{ SUBSCRIPTIONS_KV: KVNamespace }} env
+   * @param {{ Track: KVNamespace }} env
    * @param {ExecutionContext} ctx
    */
   async scheduled(event, env, ctx) {
