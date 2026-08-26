@@ -2293,7 +2293,7 @@ async function handleExportBackup(request, env) {
       status: 200,
       headers: {
         "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": `attachment; filename="zq-track-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json"`
+        "Content-Disposition": `attachment; filename="substracker-backup-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json"`
       }
     });
   } catch (error) {
@@ -2466,7 +2466,7 @@ var init_backup = __esm({
     init_kv();
     init_config2();
     init_extras();
-    BACKUP_FORMAT = "zq-track-backup";
+    BACKUP_FORMAT = "substracker-backup";
     BACKUP_VERSION = 1;
     NEVER_EXPORT_FIELDS = ["JWT_SECRET", "ADMIN_PASSWORD"];
   }
@@ -5075,7 +5075,7 @@ ${payload.content}` : String(payload.content || "");
     return telegramChannel.send(
       {
         title: "\u8BA2\u9605\u7BA1\u7406 - \u6D4B\u8BD5\u901A\u77E5",
-        content: "\u8FD9\u662F\u4E00\u6761\u6765\u81EA\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B\u7684\u6D4B\u8BD5\u6D88\u606F\u3002\u5982\u679C\u4F60\u6536\u5230\u6B64\u6D88\u606F\uFF0C\u8BF4\u660E Telegram \u914D\u7F6E\u6B63\u5E38\u3002"
+        content: "\u8FD9\u662F\u4E00\u6761\u6765\u81EA\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF\u7684\u6D4B\u8BD5\u6D88\u606F\u3002\u5982\u679C\u4F60\u6536\u5230\u6B64\u6D88\u606F\uFF0C\u8BF4\u660E Telegram \u914D\u7F6E\u6B63\u5E38\u3002"
       },
       config
     );
@@ -5313,9 +5313,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   <div class="header"><h1>\u{1F4C5} ${safe(title)}</h1></div>
   <div class="content">
     <div class="highlight">${safe(stripMarkdown(content)).replace(/\n/g, "<br>")}</div>
-    <p style="color:#666;line-height:1.6;">\u6B64\u90AE\u4EF6\u7531\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B\u81EA\u52A8\u53D1\u9001\uFF0C\u8BF7\u53CA\u65F6\u5904\u7406\u76F8\u5173\u8BA2\u9605\u4E8B\u52A1\u3002</p>
+    <p style="color:#666;line-height:1.6;">\u6B64\u90AE\u4EF6\u7531\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF\u81EA\u52A8\u53D1\u9001\uFF0C\u8BF7\u53CA\u65F6\u5904\u7406\u76F8\u5173\u8BA2\u9605\u4E8B\u52A1\u3002</p>
   </div>
-  <div class="footer"><p>\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B | \u53D1\u9001\u65F6\u95F4: ${safe(ts)}</p></div>
+  <div class="footer"><p>\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF | \u53D1\u9001\u65F6\u95F4: ${safe(ts)}</p></div>
 </div>
 </body></html>`;
 }
@@ -6184,7 +6184,8 @@ var loginPage_default = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
+  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <title>\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources}  <style>
@@ -6220,7 +6221,7 @@ var loginPage_default = `
 <body class="login-container flex items-center justify-center">
   <div class="login-box p-8 rounded-xl w-full max-w-md">
     <div class="text-center mb-8">
-      <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-calendar-check mr-2"></i>\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</h1>
+      <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-calendar-check mr-2"></i>\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</h1>
       <p class="text-gray-600 mt-2">\u767B\u5F55\u7BA1\u7406\u60A8\u7684\u8BA2\u9605\u63D0\u9192</p>
     </div>
     
@@ -6297,7 +6298,8 @@ var adminPage_default = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u8BA2\u9605\u5217\u8868\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
+  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <title>\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources}  <style>
@@ -6674,7 +6676,7 @@ var adminPage_default = `
         <div class="flex items-center shrink-0">
           <div class="flex items-center">
             <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
+            <span class="font-bold text-xl text-gray-800">\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</span>
           </div>
           <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
         </div>
@@ -10305,7 +10307,8 @@ var configPage_default = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u7CFB\u7EDF\u914D\u7F6E\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
+  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <title>\u7CFB\u7EDF\u914D\u7F6E - \u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources} <style>
@@ -10384,7 +10387,7 @@ var configPage_default = `
         <div class="flex items-center shrink-0">
           <div class="flex items-center">
             <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
+            <span class="font-bold text-xl text-gray-800">\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</span>
           </div>
           <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
         </div>
@@ -10889,7 +10892,7 @@ var configPage_default = `
               </div>
               <div>
                 <label for="ntfyTopic" class="block text-sm font-medium text-gray-700">Topic\uFF08\u4E3B\u9898\uFF09</label>
-                <input type="text" id="ntfyTopic" placeholder="\u4F8B\u5982 my-zq-track-alerts" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <input type="text" id="ntfyTopic" placeholder="\u4F8B\u5982 my-substracker-alerts" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
               </div>
               <div class="md:col-span-2">
                 <label for="ntfyToken" class="block text-sm font-medium text-gray-700">Access Token\uFF08\u53EF\u9009\uFF09</label>
@@ -11978,7 +11981,7 @@ var configPage_default = `
           const a = document.createElement('a');
           const objectUrl = URL.createObjectURL(blob);
           a.href = objectUrl;
-          a.download = 'zq-track-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+          a.download = 'substracker-backup-' + new Date().toISOString().slice(0, 10) + '.json';
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -12065,7 +12068,8 @@ var dashboardPage_default = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u4EEA\u8868\u76D8\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
+  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <title>\u4EEA\u8868\u76D8 - SubsTracker</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources}  <style>
@@ -12137,7 +12141,7 @@ var dashboardPage_default = `<!DOCTYPE html>
         <div class="flex items-center shrink-0">
           <div class="flex items-center">
             <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
+            <span class="font-bold text-xl text-gray-800">\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</span>
           </div>
           <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
         </div>
@@ -12601,7 +12605,8 @@ var notifyLogsPage_default = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\u901A\u77E5\u5386\u53F2\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
+  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <title>\u901A\u77E5\u5386\u53F2 - \u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources}
@@ -12632,7 +12637,7 @@ var notifyLogsPage_default = `<!DOCTYPE html>
         <div class="flex items-center shrink-0">
           <div class="flex items-center">
             <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
+            <span class="font-bold text-xl text-gray-800">\u8BA2\u9605\u7BA1\u7406\u7CFB\u7EDF</span>
           </div>
           <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
         </div>
@@ -13182,7 +13187,8 @@ async function handleDebug(request, env) {
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>\u8C03\u8BD5\u4FE1\u606F\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
+  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <title>\u8C03\u8BD5\u4FE1\u606F - SubsTracker</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace; padding: 20px; background: #f5f5f5; color: #333; }
     h1 { font-size: 22px; }
