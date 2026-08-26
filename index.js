@@ -7687,11 +7687,54 @@ const lunarBiz = {
       }
     }
 
-    function formatReminderRulesSummary(rules) {
+    function formatReminderRulesSummary(rules, expiryDate) {
       const list = Array.isArray(rules) ? rules.filter(function (r) { return r && r.isEnabled !== false; }) : [];
       if (list.length === 0) return '';
 
       var parts = [];
+      
+      // 如果有到期日期，计算每个规则的具体提醒时间
+      if (expiryDate) {
+        var expiry;
+        if (typeof expiryDate === 'string') {
+          var parts2 = expiryDate.split('-');
+          if (parts2.length === 3) {
+            expiry = new Date(parseInt(parts2[0], 10), parseInt(parts2[1], 10) - 1, parseInt(parts2[2], 10), 0, 0, 0, 0);
+          }
+        } else if (expiryDate instanceof Date) {
+          expiry = new Date(expiryDate.getFullYear(), expiryDate.getMonth(), expiryDate.getDate(), 0, 0, 0, 0);
+        }
+        
+        if (expiry && !isNaN(expiry.getTime())) {
+          var timeList = [];
+          list.forEach(function(r) {
+            var reminderDate = new Date(expiry);
+            var val = Number(r.value) || 0;
+            if (r.type === 'before_expiry') {
+              if (r.unit === 'hours') {
+                reminderDate.setHours(reminderDate.getHours() - val);
+              } else {
+                reminderDate.setDate(reminderDate.getDate() - val);
+              }
+            } else if (r.type === 'after_expiry') {
+              if (r.unit === 'hours') {
+                reminderDate.setHours(reminderDate.getHours() + val);
+              } else {
+                reminderDate.setDate(reminderDate.getDate() + val);
+              }
+            }
+            var y = reminderDate.getFullYear();
+            var m = String(reminderDate.getMonth() + 1).padStart(2, '0');
+            var d = String(reminderDate.getDate()).padStart(2, '0');
+            var h = String(reminderDate.getHours()).padStart(2, '0');
+            var min = String(reminderDate.getMinutes()).padStart(2, '0');
+            timeList.push(y + '-' + m + '-' + d + ' ' + h + ':' + min);
+          });
+          return timeList.join('<br>');
+        }
+      }
+      
+      // 没有到期日期时 fallback 到原来的显示
       var beforeDays = list
         .filter(function (r) { return r.type === 'before_expiry' && r.unit !== 'hours'; })
         .map(function (r) { return r.value; })
@@ -7720,7 +7763,7 @@ const lunarBiz = {
       // \u4F18\u5148\u4F7F\u7528\u771F\u5B9E\u591A\u89C4\u5219\uFF08\u5217\u8868 API \u5DF2\u9644\u5E26 reminderRules / reminderRulesSummary\uFF09
       // \u6CE8\u610F\uFF1A\u6574\u51FD\u6570\u7EDF\u4E00\u7528 var\uFF0C\u907F\u514D var/let \u540C\u540D\u91CD\u590D\u58F0\u660E\u5BFC\u81F4\u6574\u9875\u811A\u672C\u4E2D\u65AD
       var rules = Array.isArray(subscription.reminderRules) ? subscription.reminderRules : null;
-      var summary = subscription.reminderRulesSummary || (rules ? formatReminderRulesSummary(rules) : '');
+      var summary = rules ? formatReminderRulesSummary(rules, subscription.expiryDate) : (subscription.reminderRulesSummary || '');
       var unit;
       var value;
 
@@ -8072,7 +8115,7 @@ const lunarBiz = {
           : '';
         const startDateHtml = startDateText ? createHoverText(startDateText, 30, 'text-xs text-gray-500 mt-1') : '';
 
-        const reminderHtml = '<div class="text-sm text-gray-900"><i class="fas fa-bell mr-1 text-indigo-500"></i>' +
+        const reminderHtml = '<div class="text-sm text-gray-900">' +
           reminder.displayText + '</div>' +
           '<div class="text-xs text-gray-400 mt-1">\u7CBE\u786E\u65E5\u89E6\u53D1</div>';
 
@@ -10112,6 +10155,74 @@ const lunarBiz = {
         render();
       };
 
+      function getReminderTimeText(rule) {
+        const expiryInput = document.getElementById('expiryDate');
+        if (!expiryInput || !expiryInput.value) return '';
+        const expiryStr = expiryInput.value.trim();
+        const parts = expiryStr.split('-');
+        if (parts.length !== 3) return '';
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const expiryDate = new Date(year, month, day, 0, 0, 0, 0);
+        if (isNaN(expiryDate.getTime())) return '';
+        
+        const reminderDate = new Date(expiryDate);
+        const value = Number(rule.value) || 0;
+        const unit = rule.unit || 'days';
+        const type = rule.type || 'before_expiry';
+        
+        if (type === 'before_expiry') {
+          if (unit === 'days') {
+            reminderDate.setDate(reminderDate.getDate() - value);
+          } else if (unit === 'hours') {
+            reminderDate.setHours(reminderDate.getHours() - value);
+          }
+        } else if (type === 'after_expiry') {
+          if (unit === 'days') {
+            reminderDate.setDate(reminderDate.getDate() + value);
+          } else if (unit === 'hours') {
+            reminderDate.setHours(reminderDate.getHours() + value);
+          }
+        }
+        
+        const now = new Date();
+        
+        const y = reminderDate.getFullYear();
+        const m = String(reminderDate.getMonth() + 1).padStart(2, '0');
+        const d = String(reminderDate.getDate()).padStart(2, '0');
+        const h = String(reminderDate.getHours()).padStart(2, '0');
+        const min = String(reminderDate.getMinutes()).padStart(2, '0');
+        return '\u63D0\u9192\u65F6\u95F4: ' + y + '-' + m + '-' + d + ' ' + h + ':' + min;
+      }
+
+      function updateAllReminderTimes() {
+        const container = document.getElementById('reminderRulesContainer');
+        if (!container) return;
+        const rows = container.querySelectorAll('[data-rule-id]');
+        rows.forEach(row => {
+          const rule = rules.find(r => r.id === row.dataset.ruleId);
+          if (!rule) return;
+          // 直接从DOM读取最新值，确保用户输入实时生效
+          const typeEl = row.querySelector('.rule-type');
+          const valueEl = row.querySelector('.rule-value');
+          const unitEl = row.querySelector('.rule-unit');
+          const enabledEl = row.querySelector('.rule-enabled');
+          const tempRule = {};
+          for (var k in rule) tempRule[k] = rule[k];
+          if (typeEl) tempRule.type = typeEl.value;
+          if (valueEl) tempRule.value = Number(valueEl.value) || 0;
+          if (unitEl) tempRule.unit = unitEl.value;
+          if (enabledEl) tempRule.isEnabled = enabledEl.checked;
+          const timeEl = row.querySelector('.rule-reminder-time');
+          if (timeEl) {
+            const text = tempRule.isEnabled ? getReminderTimeText(tempRule) : '';
+            timeEl.textContent = text;
+            timeEl.style.display = text ? '' : 'none';
+          }
+        });
+      }
+
       function renderRow(rule) {
         const isAfter = rule.type === 'after_expiry';
         const wrap = document.createElement('div');
@@ -10137,6 +10248,7 @@ const lunarBiz = {
               \${REPEAT_UNTIL.map(u => \`<option value="\${u.value}" \${rule.repeatUntil === u.value ? 'selected' : ''}>\${u.label}</option>\`).join('')}
             </select>
           \` : ''}
+          <span class="rule-reminder-time text-xs text-indigo-600 font-medium"></span>
           <button type="button" class="rule-delete ml-auto text-xs px-2 py-1 text-red-600 hover:bg-red-50 rounded">
             <i class="fas fa-trash"></i>
           </button>
@@ -10151,6 +10263,13 @@ const lunarBiz = {
           rules = rules.filter(r => r.id !== rule.id);
           render();
         });
+        const allInputs = wrap.querySelectorAll('input, select');
+        allInputs.forEach(input => {
+          input.addEventListener('input', updateAllReminderTimes);
+          input.addEventListener('change', updateAllReminderTimes);
+        });
+        // 立即设置一次提醒时间
+        setTimeout(updateAllReminderTimes, 0);
         return wrap;
       }
 
@@ -10192,6 +10311,7 @@ const lunarBiz = {
           return;
         }
         rules.forEach(r => container.appendChild(renderRow(r)));
+        updateAllReminderTimes();
       }
 
       // \u628A\u89C4\u5219\u6570\u636E\u88C5\u8F7D\u8FDB\u7F16\u8F91\u5668
@@ -10246,10 +10366,19 @@ const lunarBiz = {
       const addSubBtn = document.getElementById('addSubscriptionBtn');
       if (addSubBtn) {
         addSubBtn.addEventListener('click', () => {
-          // \u5EF6\u8FDF\u4E00\u5E27\u8BA9\u539F\u6709 reset \u6D41\u7A0B\u8DD1\u5B8C
+          // 延迟一帧让原有 reset 流程跑完
           setTimeout(() => setRules(defaultPresets()), 0);
         });
       }
+
+      // 监听到期日期变化，更新提醒时间显示
+      const expiryDateInput = document.getElementById('expiryDate');
+      if (expiryDateInput) {
+        expiryDateInput.addEventListener('input', updateAllReminderTimes);
+        expiryDateInput.addEventListener('change', updateAllReminderTimes);
+      }
+      // 每秒更新一次提醒时间，确保日期选择/自动计算后都能显示
+      setInterval(updateAllReminderTimes, 1000);
     })();
 
     // \u7F16\u8F91\u8BA2\u9605\u65F6\u62C9\u53D6\u89C4\u5219\uFF08\u94A9\u5728 editSubscription / subscription detail \u52A0\u8F7D\u4E4B\u540E\uFF09
@@ -11119,8 +11248,8 @@ var configPage_default = `
       btn.addEventListener('click', () => {
         input.value = '';
         CLEAR_SECRET_FIELDS.add(key);
-        setSecretStatus(key, '\u5C06\u6E05\u7A7A\uFF08\u4FDD\u5B58\u540E\u751F\u6548\uFF09');
-        showToast('\u5DF2\u6807\u8BB0\u6E05\u7A7A\uFF1A' + key + '\uFF08\u70B9\u51FB\u201C\u4FDD\u5B58\u914D\u7F6E\u201D\u540E\u751F\u6548\uFF09', 'warning', 4500);
+        setSecretStatus(key, '将清空（保存后生效）');
+        showToast('已标记清空：' + key + '（点击"保存配置"后生效）', 'warning', 4500);
       });
     }
 
@@ -11676,39 +11805,6 @@ var configPage_default = `
       wireClearSecretButton('clearPushplusToken', 'pushplusToken', 'PUSHPLUS_TOKEN');
 
       loadConfig();
-
-      // \u8868\u5355\u53D8\u66F4\u68C0\u6D4B\uFF1A\u663E\u793A\u60AC\u6D6E\u4FDD\u5B58\u680F + beforeunload \u63D0\u793A
-      let configDirty = false;
-      const form = document.getElementById('configForm');
-      const floatingBar = document.getElementById('floatingSaveBar');
-
-      form.addEventListener('input', () => {
-        if (!configDirty) {
-          configDirty = true;
-          floatingBar.style.display = '';
-          requestAnimationFrame(() => floatingBar.style.transform = 'translateY(0)');
-        }
-      });
-      form.addEventListener('change', () => {
-        if (!configDirty) {
-          configDirty = true;
-          floatingBar.style.display = '';
-          requestAnimationFrame(() => floatingBar.style.transform = 'translateY(0)');
-        }
-      });
-
-      // \u4FDD\u5B58\u6210\u529F\u540E\u9690\u85CF\u60AC\u6D6E\u680F
-      form.addEventListener('submit', () => {
-        setTimeout(() => {
-          configDirty = false;
-          floatingBar.style.transform = 'translateY(100%)';
-          setTimeout(() => { floatingBar.style.display = 'none'; }, 300);
-        }, 500);
-      });
-
-      window.addEventListener('beforeunload', (e) => {
-        if (configDirty) { e.preventDefault(); e.returnValue = ''; }
-      });
     });
     
     // \u524D\u7AEF\u5C55\u793A\u65F6\u533A\uFF08\u56FA\u5B9A\u4F7F\u7528\u6D4F\u89C8\u5668\u672C\u5730\u65F6\u533A\uFF09
