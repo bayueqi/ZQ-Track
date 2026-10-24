@@ -6184,7 +6184,7 @@ var loginPage_default = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <link rel="icon" type="image/svg+xml" href="https://img.520jk.cc.cd/i/2026/10/10/452754.svg">
   <title>\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
@@ -6298,7 +6298,7 @@ var adminPage_default = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <link rel="icon" type="image/svg+xml" href="https://img.520jk.cc.cd/i/2026/10/10/452754.svg">
   <title>\u8BA2\u9605\u5217\u8868\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
@@ -10436,7 +10436,7 @@ var configPage_default = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <link rel="icon" type="image/svg+xml" href="https://img.520jk.cc.cd/i/2026/10/10/452754.svg">
   <title>\u7CFB\u7EDF\u914D\u7F6E\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
@@ -12164,7 +12164,7 @@ var dashboardPage_default = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <link rel="icon" type="image/svg+xml" href="https://img.520jk.cc.cd/i/2026/10/10/452754.svg">
   <title>\u4EEA\u8868\u76D8\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
@@ -12701,7 +12701,7 @@ var notifyLogsPage_default = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <link rel="icon" type="image/svg+xml" href="https://img.520jk.cc.cd/i/2026/10/10/452754.svg">
   <title>\u901A\u77E5\u5386\u53F2\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
@@ -13283,7 +13283,7 @@ async function handleDebug(request, env) {
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="https://img.520jacky.dpdns.org/i/2026/03/06/500044.svg">
+  <link rel="icon" type="image/svg+xml" href="https://img.520jk.cc.cd/i/2026/10/10/452754.svg">
   <title>\u8C03\u8BD5\u4FE1\u606F\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", monospace; padding: 20px; background: #f5f5f5; color: #333; }
