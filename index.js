@@ -40,7 +40,6 @@ async function getConfig(env) {
     throw new Error("KV\u5B58\u50A8\u672A\u7ED1\u5B9A");
   }
   const data = await env.Track.get("config");
-  console.log("[\u914D\u7F6E] \u4ECEKV\u8BFB\u53D6\u914D\u7F6E:", data ? "\u6210\u529F" : "\u7A7A\u914D\u7F6E");
   const config = data ? JSON.parse(data) : {};
   let jwtSecret = config.JWT_SECRET;
   if (!jwtSecret) {
@@ -2088,6 +2087,15 @@ function json(data, status = 200) {
     headers: { "Content-Type": "application/json" }
   });
 }
+function resultResponse(result, okStatus = 200) {
+  return json(result, result.success ? okStatus : 400);
+}
+function htmlResponse(body, status = 200) {
+  return new Response(body, {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8" }
+  });
+}
 async function syncLegacyAfterRulesChange(env, subId, rules) {
   try {
     const { syncLegacyReminderFields: syncLegacyReminderFields2 } = await Promise.resolve().then(() => (init_subscriptions(), subscriptions_exports));
@@ -2239,12 +2247,6 @@ __export(backup_exports, {
   handleExportBackup: () => handleExportBackup,
   handleImportBackup: () => handleImportBackup
 });
-function json2(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" }
-  });
-}
 function buildExportConfig(config, includeSecrets) {
   const out = { ...config };
   delete out.JWT_SECRET;
@@ -2298,7 +2300,7 @@ async function handleExportBackup(request, env) {
     });
   } catch (error) {
     console.error("[backup] \u5BFC\u51FA\u5931\u8D25:", error);
-    return json2(
+    return json(
       { success: false, message: "\u5BFC\u51FA\u5931\u8D25: " + (error && error.message ? error.message : String(error)) },
       500
     );
@@ -2366,14 +2368,14 @@ async function handleImportBackup(request, env) {
     try {
       body = await request.json();
     } catch {
-      return json2({ success: false, message: "\u8BF7\u6C42\u4F53\u4E0D\u662F\u5408\u6CD5 JSON" }, 400);
+      return json({ success: false, message: "\u8BF7\u6C42\u4F53\u4E0D\u662F\u5408\u6CD5 JSON" }, 400);
     }
     const rawBackup = body && body.backup ? body.backup : body;
     const mode = body && body.mode === "replace" ? "replace" : "merge";
     const includeSecrets = !!(body && body.includeSecrets);
     const validated = validateBackup(rawBackup);
     if (!validated.ok) {
-      return json2({ success: false, message: (
+      return json({ success: false, message: (
         /** @type {any} */
         validated.message
       ) }, 400);
@@ -2384,7 +2386,7 @@ async function handleImportBackup(request, env) {
     );
     const incomingSubs = backup.subscriptions.filter((s) => s && typeof s.id === "string" && s.id);
     if (mode === "replace" && incomingSubs.length === 0) {
-      return json2(
+      return json(
         { success: false, message: "\u8986\u76D6\u6A21\u5F0F\u62D2\u7EDD\u7A7A\u8BA2\u9605\u5217\u8868\uFF08\u8BF7\u786E\u8BA4\u5907\u4EFD\u5B8C\u6574\u6216\u6539\u7528\u5408\u5E76\u6A21\u5F0F\uFF09" },
         400
       );
@@ -2436,7 +2438,7 @@ async function handleImportBackup(request, env) {
       const merged = mergeConfig(currentConfig, backup.config, includeSecrets);
       await setConfig(env, merged);
     }
-    return json2({
+    return json({
       success: true,
       message: `\u6062\u590D\u5B8C\u6210\uFF08\u6A21\u5F0F: ${mode === "replace" ? "\u8986\u76D6" : "\u5408\u5E76"}\uFF09`,
       stats: {
@@ -2449,7 +2451,7 @@ async function handleImportBackup(request, env) {
     });
   } catch (error) {
     console.error("[backup] \u5BFC\u5165\u5931\u8D25:", error);
-    return json2(
+    return json(
       { success: false, message: "\u5BFC\u5165\u5931\u8D25: " + (error && error.message ? error.message : String(error)) },
       500
     );
@@ -4582,30 +4584,25 @@ async function generateJWT(username, secret) {
 async function verifyJWT(token, secret) {
   try {
     if (!token || !secret) {
-      console.log("[JWT] Token\u6216Secret\u4E3A\u7A7A");
       return null;
     }
     const parts = token.split(".");
     if (parts.length !== 3) {
-      console.log("[JWT] Token\u683C\u5F0F\u9519\u8BEF\uFF0C\u90E8\u5206\u6570\u91CF:", parts.length);
       return null;
     }
     const [headerBase64, payloadBase64, signature] = parts;
     const signatureInput = headerBase64 + "." + payloadBase64;
     const expectedSignature = await CryptoJS.HmacSHA256(signatureInput, secret);
     if (signature !== expectedSignature) {
-      console.log("[JWT] \u7B7E\u540D\u9A8C\u8BC1\u5931\u8D25");
       return null;
     }
     const payload = JSON.parse(atob(payloadBase64));
     if (payload.exp != null) {
       const exp = Number(payload.exp);
       if (!Number.isFinite(exp) || exp < Math.floor(Date.now() / 1e3)) {
-        console.log("[JWT] Token \u5DF2\u8FC7\u671F");
         return null;
       }
     }
-    console.log("[JWT] \u9A8C\u8BC1\u6210\u529F\uFF0C\u7528\u6237:", payload.username);
     return payload;
   } catch (error) {
     console.error("[JWT] \u9A8C\u8BC1\u8FC7\u7A0B\u51FA\u9519:", error);
@@ -4697,7 +4694,6 @@ init_subscriptions();
 
 // src/core/currency.js
 init_time();
-var CATEGORY_SEPARATOR_REGEX2 = /[\/，,\s]+/;
 var FALLBACK_RATES = {
   "CNY": 1,
   "USD": 6.98,
@@ -4890,7 +4886,7 @@ function getExpenseByCategory(subscriptions, timezone, rates) {
       const paymentDate = new Date(payment.date);
       const paymentParts = getTimezoneDateParts(paymentDate, timezone);
       if (paymentParts.year === currentYear) {
-        const categories = sub.category ? sub.category.split(CATEGORY_SEPARATOR_REGEX2).filter((c) => c.trim()) : ["\u672A\u5206\u7C7B"];
+        const categories = sub.category ? sub.category.split(CATEGORY_SEPARATOR_REGEX).filter((c) => c.trim()) : ["\u672A\u5206\u7C7B"];
         const amountCNY = convertToCNY(payment.amount, sub.currency, rates);
         categories.forEach((category) => {
           const cat = category.trim() || "\u672A\u5206\u7C7B";
@@ -5302,10 +5298,10 @@ function buildHtml(title, content, timezone) {
 <style>
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
 .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
-.header { background: linear-gradient(135deg, #667eea, #764ba2); padding: 30px 20px; text-align: center; }
+.header { background: #1b1b19; padding: 30px 20px; text-align: center; }
 .header h1 { color: white; margin: 0; font-size: 24px; }
 .content { padding: 30px 20px; }
-.highlight { background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0; }
+.highlight { background-color: #faf9f7; border: 1px solid #e3e2de; padding: 15px; border-radius: 6px; margin: 20px 0; }
 .footer { background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 14px; }
 </style></head>
 <body>
@@ -5852,17 +5848,14 @@ async function handleSubscriptions(request, env, path) {
   if (path === "/subscriptions") {
     if (method === "GET") {
       const subscriptions = await getAllSubscriptions(env);
-      return new Response(JSON.stringify(subscriptions), { headers: { "Content-Type": "application/json" } });
+      return json(subscriptions);
     }
     if (method === "POST") {
       let subscription;
       try {
         subscription = await request.json();
       } catch {
-        return new Response(
-          JSON.stringify({ success: false, message: "\u8BF7\u6C42\u4F53\u4E0D\u662F\u5408\u6CD5 JSON" }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
+        return json({ success: false, message: "\u8BF7\u6C42\u4F53\u4E0D\u662F\u5408\u6CD5 JSON" }, 400);
       }
       const result = await createSubscription(subscription, env);
       if (result.success && result.subscription) {
@@ -5877,10 +5870,7 @@ async function handleSubscriptions(request, env, path) {
           console.error("[subscriptions] \u5199\u5165\u63D0\u9192\u89C4\u5219\u5931\u8D25\uFF08\u8BA2\u9605\u672C\u8EAB\u5DF2\u521B\u5EFA\uFF09:", err);
         }
       }
-      return new Response(JSON.stringify(result), {
-        status: result.success ? 201 : 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      return resultResponse(result, 201);
     }
   }
   if (path.startsWith("/subscriptions/")) {
@@ -5889,14 +5879,11 @@ async function handleSubscriptions(request, env, path) {
     if (parts[3] === "toggle-status" && method === "POST") {
       const body = await request.json();
       const result = await toggleSubscriptionStatus(id, body.isActive, env);
-      return new Response(JSON.stringify(result), {
-        status: result.success ? 200 : 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      return resultResponse(result);
     }
     if (parts[3] === "test-notify" && method === "POST") {
       const result = await testSingleSubscriptionNotification(id, env);
-      return new Response(JSON.stringify(result), { status: result.success ? 200 : 400, headers: { "Content-Type": "application/json" } });
+      return resultResponse(result);
     }
     if (parts[3] === "renew" && method === "POST") {
       let options = {};
@@ -5906,25 +5893,25 @@ async function handleSubscriptions(request, env, path) {
       } catch (e) {
       }
       const result = await manualRenewSubscription(id, env, options);
-      return new Response(JSON.stringify(result), { status: result.success ? 200 : 400, headers: { "Content-Type": "application/json" } });
+      return resultResponse(result);
     }
     if (parts[3] === "payments" && method === "GET") {
       const subscription = await getSubscription(id, env);
       if (!subscription) {
-        return new Response(JSON.stringify({ success: false, message: "\u8BA2\u9605\u4E0D\u5B58\u5728" }), { status: 404, headers: { "Content-Type": "application/json" } });
+        return json({ success: false, message: "\u8BA2\u9605\u4E0D\u5B58\u5728" }, 404);
       }
-      return new Response(JSON.stringify({ success: true, payments: subscription.paymentHistory || [] }), { headers: { "Content-Type": "application/json" } });
+      return json({ success: true, payments: subscription.paymentHistory || [] });
     }
     if (parts[3] === "payments" && parts[4] && method === "DELETE") {
       const paymentId = parts[4];
       const result = await deletePaymentRecord(id, paymentId, env);
-      return new Response(JSON.stringify(result), { status: result.success ? 200 : 400, headers: { "Content-Type": "application/json" } });
+      return resultResponse(result);
     }
     if (parts[3] === "payments" && parts[4] && method === "PUT") {
       const paymentId = parts[4];
       const paymentData = await request.json();
       const result = await updatePaymentRecord(id, paymentId, paymentData, env);
-      return new Response(JSON.stringify(result), { status: result.success ? 200 : 400, headers: { "Content-Type": "application/json" } });
+      return resultResponse(result);
     }
     if (method === "GET") {
       const subscription = await getSubscription(id, env);
@@ -5934,17 +5921,14 @@ async function handleSubscriptions(request, env, path) {
           { status: 404, headers: { "Content-Type": "application/json" } }
         );
       }
-      return new Response(JSON.stringify(subscription), { headers: { "Content-Type": "application/json" } });
+      return json(subscription);
     }
     if (method === "PUT") {
       let subscription;
       try {
         subscription = await request.json();
       } catch {
-        return new Response(
-          JSON.stringify({ success: false, message: "\u8BF7\u6C42\u4F53\u4E0D\u662F\u5408\u6CD5 JSON" }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
+        return json({ success: false, message: "\u8BF7\u6C42\u4F53\u4E0D\u662F\u5408\u6CD5 JSON" }, 400);
       }
       const result = await updateSubscription(id, subscription, env);
       if (result.success && Array.isArray(subscription.reminderRules)) {
@@ -5958,11 +5942,11 @@ async function handleSubscriptions(request, env, path) {
           console.error("[subscriptions] \u66F4\u65B0\u63D0\u9192\u89C4\u5219\u5931\u8D25\uFF08\u8BA2\u9605\u672C\u4F53\u5DF2\u66F4\u65B0\uFF09:", err);
         }
       }
-      return new Response(JSON.stringify(result), { status: result.success ? 200 : 400, headers: { "Content-Type": "application/json" } });
+      return resultResponse(result);
     }
     if (method === "DELETE") {
       const result = await deleteSubscription(id, env);
-      return new Response(JSON.stringify(result), { status: result.success ? 200 : 400, headers: { "Content-Type": "application/json" } });
+      return resultResponse(result);
     }
   }
   return null;
@@ -6175,9 +6159,72 @@ init_config();
 init_utils();
 
 // src/views/theme-resources.html
-var theme_resources_default = "\n<style>\n  /* === \u5168\u5C40\u6697\u9ED1\u6A21\u5F0F\u6838\u5FC3\u53D8\u91CF\u4E0E\u8986\u76D6 === */\n  :root {\n    --dark-bg-primary: #111827;   /* \u6DF1\u7070/\u9ED1\u80CC\u666F */\n    --dark-bg-secondary: #1f2937; /* \u5361\u7247/\u5BB9\u5668\u80CC\u666F */\n    --dark-border: #374151;       /* \u8FB9\u6846\u989C\u8272 */\n    --dark-text-main: #f9fafb;    /* \u4E3B\u8981\u6587\u5B57 */\n    --dark-text-muted: #9ca3af;   /* \u6B21\u8981\u6587\u5B57 */\n  }\n  html.dark body { background-color: var(--dark-bg-primary); color: var(--dark-text-muted); }\n  html.dark .bg-white { background-color: var(--dark-bg-secondary) !important; color: var(--dark-text-main); }\n  html.dark .bg-gray-50 { background-color: var(--dark-bg-primary) !important; }\n  html.dark .bg-gray-100 { background-color: var(--dark-border) !important; }\n  html.dark .shadow-md, html.dark .shadow-lg, html.dark .shadow-xl { \n    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3); \n  }\n  html.dark .text-gray-900, html.dark .text-gray-800 { color: var(--dark-text-main) !important; }\n  html.dark .text-gray-700 { color: #d1d5db !important; }\n  html.dark .text-gray-600, html.dark .text-gray-500 { color: var(--dark-text-muted) !important; }\n  html.dark .text-indigo-600 { color: #818cf8 !important; }\n  html.dark .border-gray-200, html.dark .border-gray-300 { border-color: var(--dark-border) !important; }\n  html.dark .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: var(--dark-border) !important; }\n  html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--dark-border) !important; }\n  html.dark input, html.dark select, html.dark textarea {\n    background-color: #374151 !important;\n    border-color: #4b5563 !important;\n    color: white !important;\n  }\n  html.dark input[readonly] {\n    background-color: #1f2937 !important;\n    color: #9ca3af !important;\n  }\n  html.dark .readonly-input { background-color: #1f2937 !important; border-color: #374151 !important; color: #9ca3af !important; }\n  html.dark input::placeholder, html.dark textarea::placeholder { color: #9ca3af; }\n  html.dark input:focus, html.dark select:focus, html.dark textarea:focus {\n    border-color: #818cf8 !important;\n    background-color: #4b5563 !important;\n  }\n  html.dark nav { background-color: var(--dark-bg-secondary) !important; border-bottom: 1px solid var(--dark-border); }\n  html.dark thead {\n    background-color: #111827 !important;\n    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);\n  }\n  html.dark thead th {\n    color: #f9fafb !important;\n    background-color: #111827 !important;\n    border-bottom: 1px solid #4b5563 !important;\n    letter-spacing: 0.08em;\n  }\n  html.dark tbody tr:hover { background-color: #374151 !important; }\n  html.dark tbody tr.bg-gray-100 { background-color: #374151 !important; }\n  /* \u5F39\u7A97\u4E0E\u65E5\u671F\u9009\u62E9\u5668 */\n  html.dark .custom-date-picker { background-color: var(--dark-bg-secondary); border-color: var(--dark-border); }\n  html.dark .custom-date-picker .calendar-day { color: #e5e7eb; }\n  html.dark .custom-date-picker .calendar-day:hover { background-color: #374151; }\n  html.dark .custom-date-picker .calendar-day.other-month { color: #4b5563; }\n  html.dark .month-option, html.dark .year-option { color: #e5e7eb; }\n  html.dark .month-option:hover, html.dark .year-option:hover { background-color: #374151 !important; }\n  html.dark .custom-dropdown-list { background-color: var(--dark-bg-secondary); border-color: var(--dark-border); }\n  html.dark .dropdown-item { color: #d1d5db; border-bottom-color: var(--dark-border); }\n  html.dark .dropdown-item:hover { background-color: #374151; color: #818cf8; }\n  html.dark #mobile-menu { background-color: var(--dark-bg-secondary); border-color: var(--dark-border); }\n  html.dark #mobile-menu a { color: #e5e7eb; }\n  html.dark #mobile-menu a:hover { background-color: #374151; }\n  html.dark #mobile-menu-btn { color: #e5e7eb; }\n  html.dark #mobile-menu-btn:hover { background-color: #374151; }\n  html.dark .loading-skeleton { background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%); }\n  html.dark .table-container { box-shadow: 0 6px 12px rgba(0,0,0,0.4); }\n  html.dark .hover-tooltip, html.dark .notes-tooltip {\n    background: #111827;\n    border: 1px solid #374151;\n  }\n  html.dark .hover-tooltip::before, html.dark .notes-tooltip::before {\n    border-bottom-color: #111827;\n  }\n  html.dark .hover-text:hover, html.dark .notes-text:hover { color: #93c5fd; }\n\n  /* === \u7EDF\u4E00\u6309\u94AE\u6837\u5F0F tokens === */\n  .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); transition: all 0.2s; box-shadow: 0 6px 14px rgba(99, 102, 241, 0.25); }\n  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(99, 102, 241, 0.35); }\n  .btn-secondary { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); transition: all 0.2s; box-shadow: 0 6px 14px rgba(107, 114, 128, 0.25); }\n  .btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(107, 114, 128, 0.35); }\n  .btn-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); transition: all 0.2s; box-shadow: 0 6px 14px rgba(16, 185, 129, 0.25); }\n  .btn-success:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(16, 185, 129, 0.35); }\n  .btn-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); transition: all 0.2s; box-shadow: 0 6px 14px rgba(245, 158, 11, 0.25); }\n  .btn-warning:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(245, 158, 11, 0.35); }\n  .btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); transition: all 0.2s; box-shadow: 0 6px 14px rgba(239, 68, 68, 0.25); }\n  .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(239, 68, 68, 0.35); }\n  .btn-info { background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%); transition: all 0.2s; box-shadow: 0 6px 14px rgba(59, 130, 246, 0.25); }\n  .btn-info:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(59, 130, 246, 0.35); }\n  .btn-clone { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); transition: all 0.2s; box-shadow: 0 6px 14px rgba(20, 184, 166, 0.25); color: #fff; }\n  .btn-clone:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(20, 184, 166, 0.35); }\n  .btn-history { background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); transition: all 0.2s; box-shadow: 0 6px 14px rgba(168, 85, 247, 0.25); color: #fff; }\n  .btn-history:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(168, 85, 247, 0.35); }\n\n  @media (max-width: 767px) {   /* === \u79FB\u52A8\u7AEF\u8868\u683C\u6837\u5F0F(\u9AD8\u5BF9\u6BD4\u5EA6\u7248) === */\n    html.dark .responsive-table td:before {  /* \u5F3A\u5236\u63D0\u4EAE\u79FB\u52A8\u7AEF\u8868\u683C\u7684 Label */\n      color: #e5e7eb !important;    /* \u6539\u4E3A\u6781\u4EAE\u7684\u6D45\u7070\u8272 (\u63A5\u8FD1\u7EAF\u767D) */\n      font-weight: 700 !important;  /* \u52A0\u7C97\u5B57\u4F53 */\n      opacity: 1 !important;\n      text-transform: uppercase;    /* \u53EF\u9009\uFF1A\u589E\u52A0\u5927\u5199\u4F7F\u5176\u66F4\u7A81\u51FA */\n      letter-spacing: 0.05em;\n    }\n    html.dark .responsive-table tr {\n      border-color: #374151 !important;\n      background-color: #1f2937 !important;\n      box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important; /* \u9634\u5F71\u7A0D\u5FAE\u52A0\u6DF1 */\n    }\n    \n    html.dark .responsive-table td {\n      border-bottom-color: #374151 !important;\n    }\n    \n    html.dark .td-content-wrapper {\n        color: #f3f4f6;\n    }\n  }\n</style>\n<script>\n  (function() {\n    function applyTheme(mode) {\n      const html = document.documentElement;\n      const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;\n      \n      if (mode === 'dark' || (mode === 'system' && isSystemDark)) {\n        html.classList.add('dark');\n      } else {\n        html.classList.remove('dark');\n      }\n    }\n\n    const savedTheme = localStorage.getItem('themeMode') || 'system';\n    applyTheme(savedTheme);\n\n    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {\n      const currentMode = localStorage.getItem('themeMode') || 'system';\n      if (currentMode === 'system') {\n        applyTheme('system');\n      }\n    });\n\n    window.addEventListener('load', async () => {\n      if (window.location.pathname.startsWith('/admin')) {\n        try {\n          const res = await fetch('/api/config');\n          const config = await res.json();\n          if (config.THEME_MODE && config.THEME_MODE !== localStorage.getItem('themeMode')) {\n            localStorage.setItem('themeMode', config.THEME_MODE);\n            applyTheme(config.THEME_MODE);\n            const select = document.getElementById('themeModeSelect');\n            if (select) select.value = config.THEME_MODE;\n          }\n        } catch(e) {}\n      }\n    });\n    \n    window.updateAppTheme = function(mode) {\n      localStorage.setItem('themeMode', mode);\n      applyTheme(mode);\n    };\n  })();\n<\/script>\n";
+var theme_resources_default = "\n<style>\n/* ============================================================\n   ZQ-Track 主题层\n   中性纸灰底 + 墨色强调，全部纯色，不出现渐变与彩色投影\n   ============================================================ */\n:root {\n  --bg: #f4f3f1;\n  --surface: #ffffff;\n  --surface-2: #faf9f7;\n  --border: #e3e2de;\n  --border-strong: #d3d2cc;\n  --ink: #1b1b19;\n  --ink-2: #5b5a54;\n  --ink-3: #8c8b84;\n  --accent: #1b1b19;\n  --accent-hover: #000000;\n  --accent-ink: #ffffff;\n  --ok: #3b6f4e;\n  --ok-bg: #ecf2ee;\n  --warn: #856530;\n  --warn-bg: #f7f1e2;\n  --bad: #9e4038;\n  --bad-bg: #f9ecea;\n  --ring: rgba(27, 27, 25, 0.12);\n  --card-shadow: 0 1px 2px rgba(20, 20, 18, 0.05);\n  /* 兼容旧变量 */\n  --dark-bg-primary: #0f0f0e;\n  --dark-bg-secondary: #171716;\n  --dark-border: #2a2a27;\n  --dark-text-main: #ebe9e5;\n  --dark-text-muted: #a7a6a0;\n}\nhtml.dark {\n  --bg: #0f0f0e;\n  --surface: #171716;\n  --surface-2: #1d1d1b;\n  --border: #2a2a27;\n  --border-strong: #3b3b37;\n  --ink: #ebe9e5;\n  --ink-2: #a7a6a0;\n  --ink-3: #7b7a74;\n  --accent: #ebe9e5;\n  --accent-hover: #ffffff;\n  --accent-ink: #141413;\n  --ok: #82b596;\n  --ok-bg: rgba(130, 181, 150, 0.13);\n  --warn: #c8a664;\n  --warn-bg: rgba(200, 166, 100, 0.13);\n  --bad: #cf8a83;\n  --bad-bg: rgba(207, 138, 131, 0.13);\n  --ring: rgba(235, 233, 229, 0.16);\n  --card-shadow: none;\n}\n\nbody {\n  background-color: var(--bg) !important;\n  color: var(--ink) !important;\n  -webkit-font-smoothing: antialiased;\n  -moz-osx-font-smoothing: grayscale;\n}\nh1, h2, h3, h4, h5 { letter-spacing: -0.01em; }\n\n/* ---------- 顶栏 ---------- */\nnav {\n  background-color: var(--surface) !important;\n  border-bottom: 1px solid var(--border);\n  box-shadow: none !important;\n}\nnav a { border-bottom-color: transparent !important; }\nnav a.border-indigo-600 { background-color: var(--surface-2); border-radius: 6px; }\n#mobile-menu { background-color: var(--surface) !important; border-color: var(--border) !important; }\n\n/* ---------- 卡片与阴影 ---------- */\n.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {\n  box-shadow: var(--card-shadow) !important;\n}\n.bg-white.rounded-lg.shadow-md,\n.bg-white.rounded-lg.shadow-lg,\n.bg-white.rounded-lg.shadow-xl {\n  border: 1px solid var(--border);\n}\n.rounded-lg { border-radius: 8px !important; }\n.rounded-xl { border-radius: 10px !important; }\n.rounded-md { border-radius: 6px !important; }\n.rounded { border-radius: 5px !important; }\n\n/* ---------- 表格 ---------- */\ntable { background-color: var(--surface); }\nthead { background-color: var(--surface-2) !important; }\nth {\n  font-size: 0.75rem !important;\n  font-weight: 500 !important;\n  letter-spacing: 0.04em !important;\n  text-transform: none !important;\n  color: var(--ink-3) !important;\n}\ntbody tr { border-color: var(--border) !important; }\ntbody td { vertical-align: top; }\ntbody td .rounded-full { white-space: nowrap; }\n.action-buttons-wrapper {\n  display: grid !important;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 0.125rem 0.25rem;\n  min-width: 8.5rem;\n}\ntbody tr.bg-gray-100 { background-color: var(--bg) !important; }\n.table-container {\n  background-color: var(--surface);\n  border: 1px solid var(--border);\n  border-radius: 8px;\n  box-shadow: none !important;\n}\n\n/* ---------- 中性色重映射 ---------- */\n.text-gray-900, .text-gray-800 { color: var(--ink) !important; }\n.text-gray-700, .text-gray-600 { color: var(--ink-2) !important; }\n.text-gray-500, .text-gray-400 { color: var(--ink-3) !important; }\n.bg-white { background-color: var(--surface) !important; }\n.bg-gray-50 { background-color: var(--surface-2) !important; }\n.bg-gray-100 { background-color: var(--bg) !important; }\n.border-gray-100, .border-gray-200, .border-gray-300 { border-color: var(--border) !important; }\n.divide-gray-200 > :not([hidden]) ~ :not([hidden]),\n.divide-y > :not([hidden]) ~ :not([hidden]) { border-color: var(--border) !important; }\n\n/* ---------- 主色：曾经的靛蓝/紫统一收成墨色 ---------- */\n.text-indigo-500, .text-indigo-600, .text-indigo-700, .text-indigo-800 { color: var(--ink) !important; }\n.hover\\:text-indigo-600:hover,\n.hover\\:text-indigo-800:hover,\n.group:hover .group-hover\\:text-indigo-700 { color: var(--ink) !important; }\n.bg-indigo-50, .bg-blue-50, .bg-amber-50 { background-color: var(--surface-2) !important; }\n.hover\\:bg-gray-50:hover, .hover\\:bg-gray-100:hover,\n.active\\:bg-gray-200:active { background-color: var(--surface-2) !important; }\n.bg-indigo-100, .bg-purple-100, .bg-blue-100,\n.bg-green-100, .bg-yellow-100, .bg-red-100 {\n  background-color: var(--surface-2) !important;\n  color: var(--ink-2) !important;\n}\n.bg-indigo-600 { background-color: var(--accent) !important; color: var(--accent-ink) !important; }\n.hover\\:bg-indigo-700:hover { background-color: var(--accent-hover) !important; }\n.border-indigo-600, .border-indigo-500 { border-color: var(--ink) !important; }\n.border-indigo-200, .border-purple-200, .border-blue-200, .border-amber-300 { border-color: var(--border) !important; }\n.hover\\:bg-indigo-50:hover, .active\\:bg-indigo-100:active { background-color: var(--surface-2) !important; }\n.focus\\:ring-indigo-500:focus { box-shadow: 0 0 0 3px var(--ring) !important; }\n.focus\\:border-indigo-500:focus { border-color: var(--ink) !important; }\n\n/* ---------- 语义色降饱和 ---------- */\n.text-green-500, .text-green-600, .text-green-700, .text-green-800 { color: var(--ok) !important; }\n.text-yellow-500, .text-yellow-600, .text-yellow-700,\n.text-orange-500, .text-amber-600, .text-amber-700, .text-amber-900 { color: var(--warn) !important; }\n.text-red-500, .text-red-600, .text-red-700 { color: var(--bad) !important; }\n.text-blue-500, .text-blue-600, .text-blue-800, .text-blue-900,\n.text-purple-500, .text-purple-600, .text-purple-800 { color: var(--ink-3) !important; }\n.hover\\:text-red-600:hover, .hover\\:text-red-800:hover { color: var(--bad) !important; }\n.hover\\:bg-red-50:hover, .active\\:bg-red-100:active { background-color: var(--bad-bg) !important; }\n.hover\\:border-red-300:hover, .border-red-500 { border-color: var(--bad) !important; }\n.hover\\:bg-green-600:hover { background-color: var(--ok) !important; }\n.hover\\:bg-blue-600:hover { background-color: var(--ink-2) !important; }\n.bg-green-500 { background-color: var(--ok) !important; }\n.bg-yellow-500 { background-color: var(--warn) !important; }\n.bg-red-500 { background-color: var(--bad) !important; }\n.bg-blue-500 { background-color: var(--ink-3) !important; }\n.bg-gray-500 { background-color: var(--ink-3) !important; }\n\n/* 状态胶囊：实心改淡底 */\n.rounded-full.bg-green-500 { background-color: var(--ok-bg) !important; color: var(--ok) !important; }\n.rounded-full.bg-yellow-500 { background-color: var(--warn-bg) !important; color: var(--warn) !important; }\n.rounded-full.bg-red-500 { background-color: var(--bad-bg) !important; color: var(--bad) !important; }\n.rounded-full.bg-gray-500 { background-color: var(--surface-2) !important; color: var(--ink-3) !important; }\n\n/* ---------- 按钮 ---------- */\n.btn-primary, .btn-secondary, .btn-success, .btn-warning,\n.btn-danger, .btn-info, .btn-clone, .btn-history {\n  background: var(--surface) !important;\n  color: var(--ink-2) !important;\n  border: 1px solid var(--border-strong) !important;\n  border-radius: 6px !important;\n  box-shadow: none !important;\n  font-weight: 500;\n  transition: background-color .15s ease, color .15s ease, border-color .15s ease;\n}\n.btn-primary {\n  background: var(--accent) !important;\n  border-color: var(--accent) !important;\n  color: var(--accent-ink) !important;\n}\n.btn-primary:hover {\n  background: var(--accent-hover) !important;\n  border-color: var(--accent-hover) !important;\n  transform: none !important;\n  box-shadow: none !important;\n}\n.btn-secondary:hover, .btn-success:hover, .btn-warning:hover, .btn-info:hover,\n.btn-clone:hover, .btn-history:hover {\n  background: var(--surface-2) !important;\n  color: var(--ink) !important;\n  transform: none !important;\n  box-shadow: none !important;\n}\n.btn-danger { color: var(--bad) !important; }\n.btn-danger:hover {\n  background: var(--bad-bg) !important;\n  color: var(--bad) !important;\n  transform: none !important;\n  box-shadow: none !important;\n}\n\n/* 表格操作列：去彩色，只留文字 */\n.action-buttons-wrapper button {\n  background: transparent !important;\n  border: 0 !important;\n  box-shadow: none !important;\n  color: var(--ink-2) !important;\n  border-radius: 5px !important;\n  font-weight: 500;\n  text-align: left;\n}\n.action-buttons-wrapper button:hover { background: var(--surface-2) !important; color: var(--ink) !important; }\n.action-buttons-wrapper .btn-danger,\n.action-buttons-wrapper .delete { color: var(--bad) !important; }\n.action-buttons-wrapper .delete:hover { background: var(--bad-bg) !important; }\n\n/* ---------- 表单 ---------- */\ninput[type=\"text\"], input[type=\"password\"], input[type=\"number\"],\ninput[type=\"date\"], input[type=\"search\"], input[type=\"email\"],\ninput[type=\"url\"], select, textarea {\n  background-color: var(--surface) !important;\n  border: 1px solid var(--border-strong) !important;\n  border-radius: 6px !important;\n  color: var(--ink) !important;\n}\ninput:focus, select:focus, textarea:focus {\n  outline: none !important;\n  border-color: var(--ink) !important;\n  box-shadow: 0 0 0 3px var(--ring) !important;\n}\ninput::placeholder, textarea::placeholder { color: var(--ink-3) !important; }\ninput[type=\"checkbox\"], input[type=\"radio\"] { accent-color: var(--ink); }\ninput[readonly], .readonly-input {\n  background-color: var(--surface-2) !important;\n  color: var(--ink-2) !important;\n  border-color: var(--border) !important;\n}\n\n/* ---------- 下拉与日历 ---------- */\n.custom-dropdown-list {\n  background: var(--surface) !important;\n  border: 1px solid var(--border) !important;\n  border-radius: 6px !important;\n  box-shadow: 0 8px 24px rgba(20, 20, 18, .12) !important;\n}\n.dropdown-item {\n  color: var(--ink-2) !important;\n  border-bottom-color: var(--border) !important;\n}\n.dropdown-item:hover, .dropdown-item:active {\n  background: var(--surface-2) !important;\n  color: var(--ink) !important;\n}\n.custom-date-picker {\n  background: var(--surface) !important;\n  border: 1px solid var(--border) !important;\n  border-radius: 10px !important;\n  box-shadow: 0 16px 40px rgba(20, 20, 18, .18) !important;\n}\n.custom-date-picker .calendar-day { border-radius: 5px !important; }\n.custom-date-picker .calendar-day:hover {\n  background: var(--surface-2) !important;\n  color: var(--ink) !important;\n  transform: none !important;\n}\n.custom-date-picker .calendar-day.selected {\n  background: var(--accent) !important;\n  color: var(--accent-ink) !important;\n  transform: none !important;\n  box-shadow: none !important;\n}\n.custom-date-picker .calendar-day.today {\n  background: var(--surface-2) !important;\n  color: var(--ink) !important;\n  border: 1px solid var(--border-strong) !important;\n}\n.custom-date-picker .calendar-day.other-month { color: var(--ink-3) !important; opacity: .55; }\n.custom-date-picker .calendar-day.selected .lunar-text { color: rgba(255, 255, 255, .85) !important; }\n.custom-date-picker .calendar-day.today .lunar-text { color: var(--ink-2) !important; }\n.month-option, .year-option { color: var(--ink-2); }\n.month-option:hover, .year-option:hover {\n  background: var(--surface-2) !important;\n  border-color: var(--border-strong) !important;\n  color: var(--ink) !important;\n}\n.month-option.selected, .year-option.selected {\n  background: var(--accent) !important;\n  border-color: var(--accent) !important;\n  color: var(--accent-ink) !important;\n}\n\n/* ---------- 浮层 ---------- */\n#subscriptionModal { background-color: rgba(18, 18, 16, .45) !important; }\n#paymentHistoryModal { background-color: rgba(18, 18, 16, .45) !important; }\n#subscriptionModal > div,\n#paymentHistoryModal > div {\n  border: 1px solid var(--border) !important;\n  box-shadow: 0 24px 48px -16px rgba(20, 20, 18, .28) !important;\n}\n.hover-text:hover, .notes-text:hover { color: var(--ink) !important; }\nhtml.dark .hover-tooltip, html.dark .notes-tooltip { border: 1px solid var(--border); }\n\n/* ---------- Toast ---------- */\n#toast-container {\n  position: fixed; top: 20px; right: 20px; z-index: 10000;\n  display: flex; flex-direction: column; gap: 8px; max-width: 380px;\n}\n.toast {\n  padding: 12px 36px 12px 16px; border-radius: 7px; position: relative;\n  color: var(--accent-ink); font-weight: 500;\n  transform: translateX(400px);\n  transition: transform .3s ease-in-out, background-color .15s ease;\n  box-shadow: 0 10px 24px rgba(20, 20, 18, .18);\n}\n.toast .toast-close {\n  position: absolute; top: 8px; right: 10px; cursor: pointer;\n  opacity: .7; font-size: 14px; line-height: 1;\n}\n.toast .toast-close:hover { opacity: 1; }\n.toast.show { transform: translateX(0); }\n.toast.success { background-color: var(--ok) !important; }\n.toast.error { background-color: var(--bad) !important; }\n.toast.info { background-color: var(--ink) !important; }\n.toast.warning { background-color: var(--warn) !important; }\n\n/* ---------- 骨架屏 ---------- */\n.loading-skeleton {\n  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%) !important;\n  background-size: 200% 100%;\n}\n\n/* ---------- 深色模式下的中性覆盖 ---------- */\nhtml.dark body { background-color: var(--bg) !important; color: var(--ink-2); }\nhtml.dark nav { background-color: var(--surface) !important; border-bottom: 1px solid var(--border); }\nhtml.dark thead { background-color: var(--surface-2) !important; box-shadow: none !important; }\nhtml.dark thead th { background-color: transparent !important; color: var(--ink-3) !important; border-bottom: 1px solid var(--border) !important; letter-spacing: .04em !important; }\nhtml.dark tbody tr:hover { background-color: var(--surface-2) !important; }\nhtml.dark tbody tr.bg-gray-100 { background-color: var(--bg) !important; }\nhtml.dark #mobile-menu { background-color: var(--surface) !important; border-color: var(--border) !important; }\nhtml.dark #mobile-menu a { color: var(--ink-2); }\nhtml.dark #mobile-menu a:hover { background-color: var(--surface-2); }\nhtml.dark #mobile-menu-btn { color: var(--ink-2); }\nhtml.dark #mobile-menu-btn:hover { background-color: var(--surface-2); }\nhtml.dark .responsive-table tr { background-color: var(--surface) !important; border-color: var(--border) !important; box-shadow: none !important; }\nhtml.dark .responsive-table td { border-bottom-color: var(--border) !important; }\nhtml.dark .responsive-table td:before { color: var(--ink-3) !important; font-weight: 500 !important; opacity: 1 !important; letter-spacing: .02em; }\nhtml.dark .td-content-wrapper { color: var(--ink-2); }\n</style>\n";
+// 四个管理页共用的前端小工具（转义、Toast、带 401 处理的 fetch）
+var client_runtime_default = "<script>\n    function escapeHtml(value) {\n      return String(value == null ? '' : value)\n        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n        .replace(/\"/g, '&quot;').replace(/'/g, '&#39;');\n    }\n    function showToast(message, type = 'success', duration) {\n      const container = document.getElementById('toast-container');\n      if (!container) return;\n      if (!duration) duration = type === 'error' ? 6000 : type === 'warning' ? 4500 : 3000;\n      while (container.children.length >= 5) container.removeChild(container.firstChild);\n      const toast = document.createElement('div');\n      toast.className = 'toast ' + type;\n      const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle';\n      toast.innerHTML = '<div class=\"flex items-center\"><i class=\"fas fa-' + icon + ' mr-2\"></i><span class=\"toast-msg\"></span></div><span class=\"toast-close\" onclick=\"this.parentElement.remove()\">&times;</span>';\n      toast.querySelector('.toast-msg').textContent = message;\n      container.appendChild(toast);\n      setTimeout(() => toast.classList.add('show'), 50);\n      const timer = setTimeout(() => {\n        toast.classList.remove('show');\n        setTimeout(() => { if (container.contains(toast)) container.removeChild(toast); }, 300);\n      }, duration);\n      toast.querySelector('.toast-close').addEventListener('click', () => clearTimeout(timer));\n    }\n    async function apiFetch(url, options) {\n      const response = await fetch(url, options);\n      if (response.status === 401) {\n        if (document.getElementById('toast-container')) {\n          showToast('登录已过期，正在跳转登录页...', 'warning');\n          setTimeout(() => { window.location.href = '/'; }, 1000);\n        } else {\n          window.location.href = '/';\n        }\n        throw new Error('AUTH_EXPIRED');\n      }\n      return response;\n    }\n  </script>";
 
-// src/views/loginPage.html
+// 公共顶部导航（五个管理页共用，只有当前页高亮不同）
+var NAV_ITEMS = [
+  { key: "dashboard", href: "/admin/dashboard", icon: "fa-chart-line", label: "\u4EEA\u8868\u76D8" },
+  { key: "admin", href: "/admin", icon: "fa-list", label: "\u8BA2\u9605\u5217\u8868" },
+  { key: "notify-logs", href: "/admin/notify-logs", icon: "fa-history", label: "\u901A\u77E5\u5386\u53F2" },
+  { key: "config", href: "/admin/config", icon: "fa-cog", label: "\u7CFB\u7EDF\u914D\u7F6E" }
+];
+var NAV_DESKTOP_ACTIVE = "text-indigo-600 border-b-2 border-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition";
+var NAV_DESKTOP_IDLE = "text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition";
+var NAV_MOBILE_ACTIVE = "text-indigo-600 bg-indigo-50";
+var NAV_MOBILE_IDLE = "text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors";
+
+// 品牌图形取自 Font Awesome Free 6.0.0 solid/calendar-check
+var BRAND_PATH = "M160 32V64H288V32C288 14.33 302.3 0 320 0C337.7 0 352 14.33 352 32V64H400C426.5 64 448 85.49 448 112V160H0V112C0 85.49 21.49 64 48 64H96V32C96 14.33 110.3 0 128 0C145.7 0 160 14.33 160 32zM0 192H448V464C448 490.5 426.5 512 400 512H48C21.49 512 0 490.5 0 464V192zM328.1 304.1C338.3 295.6 338.3 280.4 328.1 271C319.6 261.7 304.4 261.7 295 271L200 366.1L152.1 319C143.6 309.7 128.4 309.7 119 319C109.7 328.4 109.7 343.6 119 352.1L183 416.1C192.4 426.3 207.6 426.3 216.1 416.1L328.1 304.1z";
+var BRAND_GLYPH = `<svg viewBox="0 0 448 512" fill="currentColor" aria-hidden="true"><path d="${BRAND_PATH}"/></svg>`;
+
+function renderNav(active) {
+  const desktop = NAV_ITEMS.map((item) => `<a href="${item.href}" class="${item.key === active ? NAV_DESKTOP_ACTIVE : NAV_DESKTOP_IDLE}">
+            <i class="fas ${item.icon} mr-1"></i>${item.label}
+          </a>`).join("\n          ");
+  const mobile = NAV_ITEMS.map((item) => `        <a href="${item.href}" class="block px-3 py-3 rounded-md text-base font-medium ${item.key === active ? NAV_MOBILE_ACTIVE : NAV_MOBILE_IDLE}">
+          <i class="fas ${item.icon} w-6 text-center mr-2"></i>${item.label}
+        </a>`).join("\n");
+  return `  <nav class="bg-white shadow-md relative z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center shrink-0">
+          <div class="flex items-center">
+            <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
+            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
+          </div>
+          <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
+        </div>
+
+        <div class="hidden md:flex items-center space-x-4 ml-auto">
+          ${desktop}
+          <a href="/api/logout" class="text-gray-700 hover:text-red-600 border-b-2 border-transparent hover:border-red-300 px-3 py-2 rounded-md text-sm font-medium transition">
+            <i class="fas fa-sign-out-alt mr-1"></i>\u9000\u51FA\u767B\u5F55
+          </a>
+        </div>
+
+        <div class="flex items-center md:hidden ml-auto">
+          <button id="mobile-menu-btn" type="button" aria-expanded="false" aria-label="\u5207\u6362\u5BFC\u822A\u83DC\u5355" class="text-gray-600 hover:text-indigo-600 focus:outline-none p-2 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-colors">
+            <i class="fas fa-bars text-xl"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-b border-gray-200 w-full">
+      <div class="px-4 pt-2 pb-4 space-y-2">
+        <div id="mobileTimeDisplay" class="px-3 py-2 text-xs text-indigo-600 text-right border-b border-gray-100 mb-2"></div>
+${mobile}
+        <a href="/api/logout" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 active:bg-red-100 transition-colors">
+          <i class="fas fa-sign-out-alt w-6 text-center mr-2"></i>\u9000\u51FA\u767B\u5F55
+        </a>
+      </div>
+    </div>
+  </nav>`;
+}
+
+// src/views/pages.js
 var loginPage_default = `
 <!DOCTYPE html>
 <html>
@@ -6192,39 +6239,40 @@ var loginPage_default = `
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources}  <style>
     .login-container {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: var(--bg);
       min-height: 100vh;
     }
     .login-box {
-      backdrop-filter: blur(8px);
-      background-color: rgba(255, 255, 255, 0.9);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 2px rgba(20, 20, 18, 0.04);
+    }
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 9px;
+      background: var(--ink);
+      color: var(--surface);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .brand-mark svg {
+      width: 20px;
+      height: auto;
+      display: block;
     }
     .input-field {
-      transition: all 0.3s;
-      border: 1px solid #e2e8f0;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
-    .input-field:focus {
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
-    }
-    html.dark .login-container {
-      background: linear-gradient(135deg, #3b4cc4 0%, #4a2b6b 100%);
-    }
-    html.dark .login-box {
-      background-color: rgba(17, 24, 39, 0.95);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    }
-    html.dark .login-box .text-gray-800 { color: #f3f4f6; }
-    html.dark .login-box .text-gray-600,
-    html.dark .login-box .text-gray-700 { color: #cbd5e1; }
   </style>
 </head>
 <body class="login-container flex items-center justify-center">
-  <div class="login-box p-8 rounded-xl w-full max-w-md">
-    <div class="text-center mb-8">
-      <h1 class="text-2xl font-bold text-gray-800"><i class="fas fa-calendar-check mr-2"></i>\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</h1>
-      <p class="text-gray-600 mt-2">\u767B\u5F55\u7BA1\u7406\u60A8\u7684\u8BA2\u9605\u63D0\u9192</p>
+  <div class="login-box p-8 w-full max-w-sm">
+    <div class="flex items-center justify-center gap-3 mb-8">
+      <div class="brand-mark">${BRAND_GLYPH}</div>
+      <h1 class="text-xl font-semibold text-gray-900">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</h1>
     </div>
     
     <form id="loginForm" class="space-y-6">
@@ -6250,7 +6298,7 @@ var loginPage_default = `
       </button>
       
       <div id="errorMsg" class="text-red-500 text-center" role="alert"></div>
-      <p class="text-xs text-amber-700 text-center mt-3 leading-relaxed">
+      <p class="text-xs text-gray-500 mt-4 leading-relaxed">
         \u82E5\u4ECD\u4F7F\u7528\u9ED8\u8BA4\u8D26\u53F7 <code>admin</code> / <code>password</code>\uFF0C\u767B\u5F55\u540E\u8BF7\u7ACB\u5373\u5728\u300C\u7CFB\u7EDF\u914D\u7F6E\u300D\u4FEE\u6539\u5BC6\u7801\u3002
       </p>
     </form>
@@ -6307,7 +6355,7 @@ var adminPage_default = `
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources}  <style>
-    .table-container { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+    .table-container { box-shadow: none; }
     .modal-container { backdrop-filter: blur(8px); }
     .readonly-input { background-color: #f8fafc; border-color: #e2e8f0; cursor: not-allowed; }
     .error-message { font-size: 0.875rem; margin-top: 0.25rem; display: none; }
@@ -6327,7 +6375,7 @@ var adminPage_default = `
       transition: all 0.3s ease;
       display: block;
     }
-    .hover-text:hover { color: #3b82f6; }
+    .hover-text:hover { color: var(--ink); }
     .hover-tooltip {
       position: fixed;
       z-index: 9999;
@@ -6383,7 +6431,7 @@ var adminPage_default = `
       transition: all 0.3s ease;
       display: block;
     }
-    .notes-text:hover { color: #3b82f6; }
+    .notes-text:hover { color: var(--ink); }
     .notes-tooltip {
       position: fixed;
       z-index: 9999;
@@ -6427,7 +6475,7 @@ var adminPage_default = `
     /* \u519C\u5386\u663E\u793A\u6837\u5F0F */
     .lunar-display {
       font-size: 0.75rem;
-      color: #6366f1;
+      color: var(--ink-3);
       margin-top: 2px;
       opacity: 0;
       transition: opacity 0.3s ease;
@@ -6496,31 +6544,32 @@ var adminPage_default = `
       border-bottom: none;
     }
     .dropdown-item:hover, .dropdown-item:active {
-      background-color: #f3f4f6;
-      color: #4f46e5;
+      background-color: var(--surface-2);
+      color: var(--ink);
     }
 
     .custom-date-picker .calendar-day:hover {
-      background-color: #e0e7ff;
-      transform: scale(1.05);
+      background-color: var(--surface-2);
+      transform: none;
     }
     
     .custom-date-picker .calendar-day.selected {
-      background-color: #6366f1;
-      color: white;
-      transform: scale(1.1);
-      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+      background-color: var(--accent);
+      color: var(--accent-ink);
+      transform: none;
+      box-shadow: none;
     }
     
     .custom-date-picker .calendar-day.today {
-      background-color: #e0e7ff;
-      color: #6366f1;
+      background-color: var(--surface-2);
+      color: var(--ink);
       font-weight: 600;
-      border: 2px solid #6366f1;
+      border: 1px solid var(--border-strong);
     }
     
     .custom-date-picker .calendar-day.other-month {
-      color: #d1d5db;
+      color: var(--ink-3);
+      opacity: 0.55;
     }
     
     .custom-date-picker .calendar-day .lunar-text {
@@ -6533,11 +6582,12 @@ var adminPage_default = `
     }
     
     .custom-date-picker .calendar-day.selected .lunar-text {
-      color: rgba(255, 255, 255, 0.9);
+      color: var(--accent-ink);
+      opacity: 0.8;
     }
     
     .custom-date-picker .calendar-day.today .lunar-text {
-      color: #6366f1;
+      color: var(--ink-2);
     }
     
     /* \u6708\u4EFD\u548C\u5E74\u4EFD\u9009\u62E9\u5668\u6837\u5F0F */
@@ -6547,15 +6597,15 @@ var adminPage_default = `
     }
     
     .month-option:hover, .year-option:hover {
-      background-color: #e0e7ff !important;
-      border-color: #6366f1;
-      color: #6366f1;
+      background-color: var(--surface-2) !important;
+      border-color: var(--border-strong);
+      color: var(--ink);
     }
     
     .month-option.selected, .year-option.selected {
-      background-color: #6366f1 !important;
-      color: white;
-      border-color: #6366f1;
+      background-color: var(--accent) !important;
+      color: var(--accent-ink);
+      border-color: var(--accent);
     }
     
     .lunar-toggle {
@@ -6614,7 +6664,7 @@ var adminPage_default = `
       .responsive-table tr { margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 0.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; }
       .responsive-table td { display: flex; justify-content: flex-start; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid #eee; }
       .responsive-table td:last-of-type { border-bottom: none; }
-      .responsive-table td:before { content: attr(data-label); font-weight: 600; text-align: left; padding-right: 1rem; color: #374151; white-space: nowrap; }
+      .responsive-table td:before { content: attr(data-label); font-weight: 600; text-align: left; padding-right: 1rem; color: var(--ink-2); white-space: nowrap; }
       .action-buttons-wrapper { justify-content: flex-start; }
 
       .notes-container, .hover-container {
@@ -6635,34 +6685,6 @@ var adminPage_default = `
       .responsive-table td[data-label="\u64CD\u4F5C"] { min-width: 16rem; }
     }
 
-    /* Toast \u6837\u5F0F */
-    #toast-container {
-      position: fixed; top: 20px; right: 20px; z-index: 10000;
-      display: flex; flex-direction: column; gap: 8px; max-width: 380px;
-    }
-    .toast {
-      padding: 12px 36px 12px 16px; border-radius: 8px; position: relative;
-      color: white; font-weight: 500; transform: translateX(400px);
-      transition: all 0.3s ease-in-out; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    .toast .toast-close {
-      position: absolute; top: 8px; right: 10px; cursor: pointer;
-      opacity: 0.7; font-size: 14px; line-height: 1;
-    }
-    .toast .toast-close:hover { opacity: 1; }
-    .toast.show { transform: translateX(0); }
-    .toast.success { background-color: #10b981; }
-    .toast.error { background-color: #ef4444; }
-    .toast.info { background-color: #3b82f6; }
-    .toast.warning { background-color: #f59e0b; }
-    html.dark .toast {
-      color: #f9fafb;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
-    }
-    html.dark .toast.success { background-color: #059669; }
-    html.dark .toast.error { background-color: #dc2626; }
-    html.dark .toast.info { background-color: #2563eb; }
-    html.dark .toast.warning { background-color: #d97706; }
 
     /* \u6A21\u6001\u6846\u52A8\u753B */
     #subscriptionModal { transition: opacity 0.2s ease; opacity: 0; }
@@ -6673,65 +6695,8 @@ var adminPage_default = `
 </head>
 <body class="bg-gray-100 min-h-screen">
   <div id="toast-container"></div>
-
-  <nav class="bg-white shadow-md relative z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center shrink-0">
-          <div class="flex items-center">
-            <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
-          </div>
-          <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
-        </div>
-
-        <div class="hidden md:flex items-center space-x-4 ml-auto">
-          <a href="/admin/dashboard" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-chart-line mr-1"></i>\u4EEA\u8868\u76D8
-          </a>
-          <a href="/admin" class="text-indigo-600 border-b-2 border-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-list mr-1"></i>\u8BA2\u9605\u5217\u8868
-          </a>
-          <a href="/admin/notify-logs" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-history mr-1"></i>\u901A\u77E5\u5386\u53F2
-          </a>
-          <a href="/admin/config" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-cog mr-1"></i>\u7CFB\u7EDF\u914D\u7F6E
-          </a>
-          <a href="/api/logout" class="text-gray-700 hover:text-red-600 border-b-2 border-transparent hover:border-red-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-sign-out-alt mr-1"></i>\u9000\u51FA\u767B\u5F55
-          </a>
-        </div>
-
-        <div class="flex items-center md:hidden ml-auto">
-          <button id="mobile-menu-btn" type="button" aria-expanded="false" aria-label="\u5207\u6362\u5BFC\u822A\u83DC\u5355" class="text-gray-600 hover:text-indigo-600 focus:outline-none p-2 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-colors">
-            <i class="fas fa-bars text-xl"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-    
-    <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-b border-gray-200 w-full">
-       <div class="px-4 pt-2 pb-4 space-y-2">
-        <div id="mobileTimeDisplay" class="px-3 py-2 text-xs text-indigo-600 text-right border-b border-gray-100 mb-2"></div>
-        <a href="/admin/dashboard" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-chart-line w-6 text-center mr-2"></i>\u4EEA\u8868\u76D8
-        </a>
-        <a href="/admin" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-list w-6 text-center mr-2"></i>\u8BA2\u9605\u5217\u8868
-        </a>
-        <a href="/admin/notify-logs" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-history w-6 text-center mr-2"></i>\u901A\u77E5\u5386\u53F2
-        </a>
-        <a href="/admin/config" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-cog w-6 text-center mr-2"></i>\u7CFB\u7EDF\u914D\u7F6E
-        </a>
-        <a href="/api/logout" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 active:bg-red-100 transition-colors">
-          <i class="fas fa-sign-out-alt w-6 text-center mr-2"></i>\u9000\u51FA\u767B\u5F55
-        </a>
-      </div>
-    </div>
-  </nav>
+  \${clientRuntime}
+  ${renderNav("admin")}
   
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -6790,25 +6755,25 @@ var adminPage_default = `
         <table class="w-full divide-y divide-gray-200 responsive-table">
           <thead class="bg-gray-50">
             <tr>
-              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 23%;">
+              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 20%;">
                 \u540D\u79F0
               </th>
               <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 13%;">
                 \u7C7B\u578B
               </th>
-              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 18%;">
+              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 16%;">
                 \u5230\u671F <i class="fas fa-sort-up ml-1 text-indigo-500" title="\u6309\u5230\u671F\u65F6\u95F4\u5347\u5E8F\u6392\u5217"></i>
               </th>
-              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 10%;">
+              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 8%;">
                 \u91D1\u989D
               </th>
-              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 13%;">
+              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 9%;">
                 \u63D0\u9192
               </th>
-              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 10%;">
+              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 11%;">
                 \u72B6\u6001
               </th>
-              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 13%;">
+              <th scope="col" class="px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider" style="width: 23%;">
                 \u64CD\u4F5C
               </th>
             </tr>
@@ -6888,8 +6853,8 @@ var adminPage_default = `
                 <label for="subscriptionMode" class="block text-sm font-medium text-gray-700">\u8BA2\u9605\u6A21\u5F0F</label>
              </div>
             <select id="subscriptionMode" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white h-10">
-              <option value="cycle" selected>\u{1F4C5} \u5FAA\u73AF\u8BA2\u9605</option>
-              <option value="reset">\u23F3 \u5230\u671F\u91CD\u7F6E</option>
+              <option value="cycle" selected>\u5FAA\u73AF\u8BA2\u9605</option>
+              <option value="reset">\u5230\u671F\u91CD\u7F6E</option>
             </select>
             <p class="mt-1 text-xs text-gray-500 leading-relaxed">
               <strong>\u5FAA\u73AF</strong>\uFF1A\u672A\u8FC7\u671F\u7EED\u8BA2\u65F6\u4ECE\u5F53\u524D\u5230\u671F\u65E5\u63A5\u7EED\uFF08\u5982\u4F1A\u5458\u7EED\u8D39\uFF09\uFF1B
@@ -7075,21 +7040,7 @@ var adminPage_default = `
 
   <script>
     // \u7EDF\u4E00 API \u8BF7\u6C42\u5C01\u88C5\uFF1A401 \u81EA\u52A8\u8DF3\u8F6C\u767B\u5F55\u9875
-    async function apiFetch(url, options) {
-      const response = await fetch(url, options);
-      if (response.status === 401) {
-        showToast('\u767B\u5F55\u5DF2\u8FC7\u671F\uFF0C\u6B63\u5728\u8DF3\u8F6C\u767B\u5F55\u9875...', 'warning');
-        setTimeout(() => { window.location.href = '/'; }, 1000);
-        throw new Error('AUTH_EXPIRED');
-      }
-      return response;
-    }
 
-    // HTML \u8F6C\u4E49\uFF0C\u9632\u6B62 XSS
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    }
 
     // \u519C\u5386\u8F6C\u6362\u5DE5\u5177\u51FD\u6570 - \u524D\u7AEF\u7248\u672C
     const lunarCalendar = {
@@ -7384,30 +7335,6 @@ const lunarBiz = {
       renderSubscriptionTable();
     }
 
-    function showToast(message, type = 'success', duration) {
-      if (!duration) duration = type === 'error' ? 6000 : type === 'warning' ? 4500 : 3000;
-      const container = document.getElementById('toast-container');
-      // \u9650\u5236\u6700\u591A 5 \u4E2A toast
-      while (container.children.length >= 5) container.removeChild(container.firstChild);
-
-      const toast = document.createElement('div');
-      toast.className = 'toast ' + type;
-      
-      const icon = type === 'success' ? 'check-circle' :
-                   type === 'error' ? 'exclamation-circle' :
-                   type === 'warning' ? 'exclamation-triangle' : 'info-circle';
-      
-      toast.innerHTML = '<div class="flex items-center"><i class="fas fa-' + icon + ' mr-2"></i><span class="toast-msg"></span></div><span class="toast-close" onclick="this.parentElement.remove()">&times;</span>';
-      toast.querySelector('.toast-msg').textContent = message;
-      
-      container.appendChild(toast);
-      setTimeout(() => toast.classList.add('show'), 50);
-      const timer = setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => { if (container.contains(toast)) container.removeChild(toast); }, 300);
-      }, duration);
-      toast.querySelector('.toast-close').addEventListener('click', () => clearTimeout(timer));
-    }
 
     function showFieldError(fieldId, message) {
       const field = document.getElementById(fieldId);
@@ -8655,15 +8582,15 @@ const lunarBiz = {
                         </button>
                     </div>
 
-                    <div class="mt-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 mb-4">
+                    <div class="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                         <div class="grid grid-cols-2 gap-4">
                             <div class="text-center">
                                 <div class="text-sm text-gray-600">\u7D2F\u8BA1\u652F\u51FA</div>
-                                <div class="text-2xl font-bold text-purple-600">\${getCurrencySymbol(subscription.currency)}\${totalAmount.toFixed(2)}</div>
+                                <div class="text-2xl font-bold text-gray-900">\${getCurrencySymbol(subscription.currency)}\${totalAmount.toFixed(2)}</div>
                             </div>
                             <div class="text-center">
                                 <div class="text-sm text-gray-600">\u652F\u4ED8\u6B21\u6570</div>
-                                <div class="text-2xl font-bold text-blue-600">\${paymentCount}</div>
+                                <div class="text-2xl font-bold text-gray-900">\${paymentCount}</div>
                             </div>
                         </div>
                     </div>
@@ -9020,7 +8947,6 @@ const lunarBiz = {
     // \u81EA\u5B9A\u4E49\u65E5\u671F\u9009\u62E9\u5668\u529F\u80FD
     class CustomDatePicker {
       constructor(inputId, pickerId, calendarId, monthId, yearId, prevBtnId, nextBtnId) {
-        console.log('CustomDatePicker \u6784\u9020\u51FD\u6570:', { inputId, pickerId, calendarId, monthId, yearId, prevBtnId, nextBtnId });
         
         this.input = document.getElementById(inputId);
         this.picker = document.getElementById(pickerId);
@@ -9041,15 +8967,6 @@ const lunarBiz = {
         this.yearRangeElement = document.getElementById(pickerId.replace('Picker', 'YearRange'));
         this.yearGrid = document.getElementById(pickerId.replace('Picker', 'YearGrid'));
         
-        console.log('\u627E\u5230\u7684\u5143\u7D20:', {
-          input: !!this.input,
-          picker: !!this.picker,
-          calendar: !!this.calendar,
-          monthElement: !!this.monthElement,
-          yearElement: !!this.yearElement,
-          prevBtn: !!this.prevBtn,
-          nextBtn: !!this.nextBtn
-        });
         
         this.currentDate = new Date();
         this.selectedDate = null;
@@ -9060,7 +8977,6 @@ const lunarBiz = {
       }
       
       init() {
-        console.log('\u521D\u59CB\u5316\u65E5\u671F\u9009\u62E9\u5668\uFF0C\u8F93\u5165\u6846:', !!this.input, '\u9009\u62E9\u5668:', !!this.picker);
         
         // \u7ED1\u5B9A\u57FA\u672C\u4E8B\u4EF6
         if (this.input) {
@@ -9167,7 +9083,6 @@ const lunarBiz = {
         }
         this._outsideClickHandler = (e) => {
           if (this.picker && !this.picker.contains(e.target) && !this.input.contains(e.target)) {
-            console.log('\u70B9\u51FB\u5916\u90E8\uFF0C\u9690\u85CF\u65E5\u671F\u9009\u62E9\u5668');
             this.hide();
           }
         };
@@ -9180,23 +9095,16 @@ const lunarBiz = {
       }
       
       toggle() {
-        console.log('toggle \u88AB\u8C03\u7528');
-        console.log('picker \u5143\u7D20:', this.picker);
-        console.log('picker \u7C7B\u540D:', this.picker ? this.picker.className : 'null');
-        console.log('\u662F\u5426\u5305\u542B hidden:', this.picker ? this.picker.classList.contains('hidden') : 'null');
         
         if (this.picker && this.picker.classList.contains('hidden')) {
-          console.log('\u663E\u793A\u65E5\u671F\u9009\u62E9\u5668');
           this.show();
         } else {
-          console.log('\u9690\u85CF\u65E5\u671F\u9009\u62E9\u5668');
           this.hide();
         }
       }
       
       // \u5F3A\u5236\u663E\u793A\u65E5\u671F\u9009\u62E9\u5668
       forceShow() {
-        console.log('forceShow \u88AB\u8C03\u7528');
         if (this.picker) {
           // \u786E\u4FDD\u9009\u62E9\u5668\u663E\u793A
           this.picker.classList.remove('hidden');
@@ -9204,7 +9112,6 @@ const lunarBiz = {
           this.currentView = 'calendar';
           this.hideAllViews();
           this.render();
-          console.log('\u65E5\u671F\u9009\u62E9\u5668\u5DF2\u663E\u793A');
         } else {
           console.error('\u65E5\u671F\u9009\u62E9\u5668\u5143\u7D20\u4E0D\u5B58\u5728');
         }
@@ -10447,133 +10354,49 @@ var configPage_default = `
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources} <style>
+    html.dark #floatingSaveBar { background-color: var(--surface); border-color: var(--border); }
+    html.dark #floatingSaveBar span { color: var(--ink-2); }
     
-    #toast-container {
-      position: fixed; top: 20px; right: 20px; z-index: 10000;
-      display: flex; flex-direction: column; gap: 8px; max-width: 380px;
+    .config-section {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      background-color: var(--surface);
     }
-    .toast {
-      padding: 12px 36px 12px 16px; border-radius: 8px; position: relative;
-      color: white; font-weight: 500; transform: translateX(400px);
-      transition: all 0.3s ease-in-out; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    .config-section.active {
+      background-color: var(--surface);
+      border-color: var(--border-strong);
     }
-    .toast .toast-close {
-      position: absolute; top: 8px; right: 10px; cursor: pointer;
-      opacity: 0.7; font-size: 14px; line-height: 1;
-    }
-    .toast .toast-close:hover { opacity: 1; }
-    .toast.show { transform: translateX(0); }
-    .toast.success { background-color: #10b981; }
-    .toast.error { background-color: #ef4444; }
-    .toast.info { background-color: #3b82f6; }
-    .toast.warning { background-color: #f59e0b; }
-    html.dark .toast {
-      color: #f9fafb;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
-    }
-    html.dark .toast.success { background-color: #059669; }
-    html.dark .toast.error { background-color: #dc2626; }
-    html.dark .toast.info { background-color: #2563eb; }
-    html.dark .toast.warning { background-color: #d97706; }
-    html.dark #floatingSaveBar { background-color: #1f2937; border-color: #374151; }
-    html.dark #floatingSaveBar span { color: #d1d5db; }
-    
-    .config-section { 
-      border: 1px solid #e5e7eb; 
-      border-radius: 8px; 
-      padding: 16px; 
-      margin-bottom: 24px; 
-    }
-    .config-section.active { 
-      background-color: #f8fafc; 
-      border-color: #6366f1; 
-    }
-    .config-section.inactive { 
-      background-color: #f9fafb; 
-      opacity: 0.7; 
+    .config-section.inactive {
+      background-color: var(--surface-2);
+      opacity: 0.75;
     }
     /* === Config Page \u6697\u9ED1\u6A21\u5F0F\u4FEE\u590D === */
     html.dark .config-section {
-      border-color: #374151;
+      border-color: var(--border);
     }
     html.dark .config-section.active {
-      background-color: rgba(31, 41, 55, 0.5); /* #1f2937 with opacity */
-      border-color: #818cf8;
+      background-color: var(--surface);
+      border-color: var(--border-strong);
     }
     html.dark .config-section.inactive {
-      background-color: #111827;
-      opacity: 0.5;
+      background-color: var(--surface-2);
+      opacity: 0.6;
     }
     html.dark .bg-indigo-50 {
-        background-color: rgba(55, 65, 81, 0.5) !important; /* \u6DF1\u7070\u8272\u5E26\u900F\u660E */
-        border-color: #4b5563 !important;
+        background-color: var(--surface-2) !important; /* \u6DF1\u7070\u8272\u5E26\u900F\u660E */
+        border-color: var(--border) !important;
     }
     html.dark .text-indigo-700 {
-        color: #a5b4fc !important; /* \u6D45\u975B\u84DD */
+        color: var(--ink) !important; /* \u6D45\u975B\u84DD */
     }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
   <div id="toast-container"></div>
-
-  <nav class="bg-white shadow-md relative z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center shrink-0">
-          <div class="flex items-center">
-            <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
-          </div>
-          <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
-        </div>
-          
-        <div class="hidden md:flex items-center space-x-4 ml-auto">
-          <a href="/admin/dashboard" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-chart-line mr-1"></i>\u4EEA\u8868\u76D8
-          </a>
-          <a href="/admin" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-list mr-1"></i>\u8BA2\u9605\u5217\u8868
-          </a>
-          <a href="/admin/notify-logs" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-history mr-1"></i>\u901A\u77E5\u5386\u53F2
-          </a>
-          <a href="/admin/config" class="text-indigo-600 border-b-2 border-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-cog mr-1"></i>\u7CFB\u7EDF\u914D\u7F6E
-          </a>
-          <a href="/api/logout" class="text-gray-700 hover:text-red-600 border-b-2 border-transparent hover:border-red-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-sign-out-alt mr-1"></i>\u9000\u51FA\u767B\u5F55
-          </a>
-        </div>
-
-        <div class="flex items-center md:hidden ml-auto">
-          <button id="mobile-menu-btn" type="button" aria-expanded="false" aria-label="\u5207\u6362\u5BFC\u822A\u83DC\u5355" class="text-gray-600 hover:text-indigo-600 focus:outline-none p-2 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-colors">
-            <i class="fas fa-bars text-xl"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-b border-gray-200 w-full">
-      <div class="px-4 pt-2 pb-4 space-y-2">
-        <div id="mobileTimeDisplay" class="px-3 py-2 text-xs text-indigo-600 text-right border-b border-gray-100 mb-2"></div>
-        <a href="/admin/dashboard" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-chart-line w-6 text-center mr-2"></i>\u4EEA\u8868\u76D8
-        </a>
-        <a href="/admin" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-list w-6 text-center mr-2"></i>\u8BA2\u9605\u5217\u8868
-        </a>
-        <a href="/admin/notify-logs" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-history w-6 text-center mr-2"></i>\u901A\u77E5\u5386\u53F2
-        </a>
-        <a href="/admin/config" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-cog w-6 text-center mr-2"></i>\u7CFB\u7EDF\u914D\u7F6E
-        </a>
-        <a href="/api/logout" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 active:bg-red-100 transition-colors">
-          <i class="fas fa-sign-out-alt w-6 text-center mr-2"></i>\u9000\u51FA\u767B\u5F55
-        </a>
-      </div>
-    </div>
-  </nav>
+  \${clientRuntime}
+  ${renderNav("config")}
   
   <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="bg-white rounded-lg shadow-md p-6">
@@ -10605,9 +10428,9 @@ var configPage_default = `
           <div class="mb-6">
             <label for="themeModeSelect" class="block text-sm font-medium text-gray-700 mb-1">\u4E3B\u9898\u6A21\u5F0F</label>
             <select id="themeModeSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white sm:text-sm">
-              <option value="light">\u{1F31E} \u6D45\u8272\u6A21\u5F0F</option>
-              <option value="dark">\u{1F319} \u6697\u9ED1\u6A21\u5F0F</option>
-              <option value="system">\u{1F5A5}\uFE0F \u8DDF\u968F\u7CFB\u7EDF</option>
+              <option value="light">\u6D45\u8272\u6A21\u5F0F</option>
+              <option value="dark">\u6697\u9ED1\u6A21\u5F0F</option>
+              <option value="system">\u8DDF\u968F\u7CFB\u7EDF</option>
             </select>
             <p class="mt-1 text-sm text-gray-500">\u9009\u62E9\u7CFB\u7EDF\u7684\u5916\u89C2\u98CE\u683C</p>
           </div>
@@ -11172,39 +10995,7 @@ var configPage_default = `
 
   <script>
     // \u7EDF\u4E00 API \u8BF7\u6C42\u5C01\u88C5\uFF1A401 \u81EA\u52A8\u8DF3\u8F6C\u767B\u5F55\u9875
-    async function apiFetch(url, options) {
-      const response = await fetch(url, options);
-      if (response.status === 401) {
-        showToast('\u767B\u5F55\u5DF2\u8FC7\u671F\uFF0C\u6B63\u5728\u8DF3\u8F6C\u767B\u5F55\u9875...', 'warning');
-        setTimeout(() => { window.location.href = '/'; }, 1000);
-        throw new Error('AUTH_EXPIRED');
-      }
-      return response;
-    }
 
-    function showToast(message, type = 'success', duration) {
-      if (!duration) duration = type === 'error' ? 6000 : type === 'warning' ? 4500 : 3000;
-      const container = document.getElementById('toast-container');
-      while (container.children.length >= 5) container.removeChild(container.firstChild);
-
-      const toast = document.createElement('div');
-      toast.className = 'toast ' + type;
-      
-      const icon = type === 'success' ? 'check-circle' :
-                   type === 'error' ? 'exclamation-circle' :
-                   type === 'warning' ? 'exclamation-triangle' : 'info-circle';
-      
-      toast.innerHTML = '<div class="flex items-center"><i class="fas fa-' + icon + ' mr-2"></i><span class="toast-msg"></span></div><span class="toast-close" onclick="this.parentElement.remove()">&times;</span>';
-      toast.querySelector('.toast-msg').textContent = message;
-      
-      container.appendChild(toast);
-      setTimeout(() => toast.classList.add('show'), 50);
-      const timer = setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => { if (container.contains(toast)) container.removeChild(toast); }, 300);
-      }, duration);
-      toast.querySelector('.toast-close').addEventListener('click', () => clearTimeout(timer));
-    }
 
     // \u8BB0\u5F55\u7528\u6237\u662F\u5426\u70B9\u51FB\u4E86\u201C\u6E05\u7A7A\u201D\u67D0\u4E2A\u5BC6\u94A5\u5B57\u6BB5\uFF1B\u4FDD\u5B58\u65F6\u4F1A\u63D0\u4EA4\u7ED9\u540E\u7AEF\u5904\u7406
     const CLEAR_SECRET_FIELDS = new Set();
@@ -12177,130 +11968,49 @@ var dashboardPage_default = `<!DOCTYPE html>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
   \${themeResources}  <style>
-    .stat-card{background:white;border-radius:12px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:transform 0.2s,box-shadow 0.2s}
-    .stat-card:hover{transform:translateY(-4px);box-shadow:0 4px 16px rgba(0,0,0,0.15)}
-    .stat-card-header{color:#6b7280;font-size:0.875rem;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem}
-    .stat-card-value{font-size:2rem;font-weight:700;color:#1f2937;margin-bottom:0.25rem}
-    .stat-card-subtitle{color:#9ca3af;font-size:0.875rem}
-    .stat-card-trend{display:inline-flex;align-items:center;gap:0.25rem;font-size:0.875rem;margin-top:0.5rem;padding:0.25rem 0.5rem;border-radius:6px}
-    .stat-card-trend.up{color:#10b981;background:#d1fae5}
-    .stat-card-trend.down{color:#ef4444;background:#fee2e2}
-    .stat-card-trend.flat{color:#6b7280;background:#f3f4f6}
-    .list-item{display:flex;align-items:center;justify-content:space-between;padding:1rem;border-radius:8px;transition:background 0.2s}
-    .list-item:hover{background:#f9fafb}
-    .list-item:not(:last-child){border-bottom:1px solid #f3f4f6}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.25rem 1.5rem}
+    .stat-card-header{color:var(--ink-3);font-size:0.8125rem;font-weight:500;letter-spacing:0.02em;margin-bottom:0.5rem}
+    .stat-card-value{font-size:1.875rem;font-weight:600;color:var(--ink);margin-bottom:0.25rem;font-variant-numeric:tabular-nums}
+    .stat-card-subtitle{color:var(--ink-3);font-size:0.8125rem}
+    .stat-card-trend{display:inline-flex;align-items:center;gap:0.25rem;font-size:0.8125rem;margin-top:0.5rem;padding:0.125rem 0.45rem;border-radius:5px}
+    .stat-card-trend.up{color:var(--ok);background:var(--ok-bg)}
+    .stat-card-trend.down{color:var(--bad);background:var(--bad-bg)}
+    .stat-card-trend.flat{color:var(--ink-2);background:var(--surface-2)}
+    .list-item{display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1rem;border-radius:6px;transition:background 0.15s}
+    .list-item:hover{background:var(--surface-2)}
+    .list-item:not(:last-child){border-bottom:1px solid var(--border)}
     .list-item-content{flex:1}
-    .list-item-name{font-weight:600;color:#1f2937;margin-bottom:0.25rem}
-    .list-item-meta{display:flex;align-items:center;gap:1rem;font-size:0.875rem;color:#6b7280;flex-wrap:wrap}
-    .list-item-amount{font-size:1.125rem;font-weight:700;color:#10b981}
-    .list-item-badge{display:inline-block;padding:0.25rem 0.75rem;border-radius:12px;font-size:0.75rem;font-weight:500;background:#e0e7ff;color:#4f46e5}
-    .ranking-item{margin-bottom:1rem}
-    .ranking-item-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem}
-    .ranking-item-name{font-weight:600;color:#1f2937}
-    .ranking-item-value{display:flex;align-items:center;gap:0.5rem;font-size:0.875rem}
-    .ranking-item-amount{font-weight:700;color:#1f2937}
-    .ranking-item-percentage{color:#10b981}
-    .ranking-progress{width:100%;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden}
-    .ranking-progress-bar{height:100%;border-radius:4px;transition:width 0.6s ease}
-    .ranking-progress-bar.color-1{background:linear-gradient(90deg,#6366f1,#8b5cf6)}
-    .ranking-progress-bar.color-2{background:linear-gradient(90deg,#10b981,#059669)}
-    .ranking-progress-bar.color-3{background:linear-gradient(90deg,#f59e0b,#d97706)}
-    .ranking-progress-bar.color-4{background:linear-gradient(90deg,#ef4444,#dc2626)}
-    .ranking-progress-bar.color-5{background:linear-gradient(90deg,#8b5cf6,#7c3aed)}
-    .empty-state{text-align:center;padding:3rem 1rem;color:#9ca3af}
-    .empty-state-icon{font-size:3rem;margin-bottom:1rem;opacity:0.5}
+    .list-item-name{font-weight:500;color:var(--ink);margin-bottom:0.25rem}
+    .list-item-meta{display:flex;align-items:center;gap:1rem;font-size:0.8125rem;color:var(--ink-3);flex-wrap:wrap}
+    .list-item-amount{font-size:1.0625rem;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+    .list-item-badge{display:inline-block;padding:0.15rem 0.55rem;border:1px solid var(--border);border-radius:5px;font-size:0.75rem;font-weight:500;background:var(--surface-2);color:var(--ink-2)}
+    .ranking-item{margin-bottom:1.1rem}
+    .ranking-item-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.45rem}
+    .ranking-item-name{font-weight:500;color:var(--ink)}
+    .ranking-item-value{display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem}
+    .ranking-item-amount{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+    .ranking-item-percentage{color:var(--ink-3)}
+    .ranking-progress{width:100%;height:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:3px;overflow:hidden}
+    .ranking-progress-bar{height:100%;border-radius:2px;background:var(--ink);transition:width 0.6s ease}
+    .ranking-progress-bar.color-1{opacity:1}
+    .ranking-progress-bar.color-2{opacity:0.8}
+    .ranking-progress-bar.color-3{opacity:0.62}
+    .ranking-progress-bar.color-4{opacity:0.46}
+    .ranking-progress-bar.color-5{opacity:0.32}
+    .empty-state{text-align:center;padding:2.5rem 1rem;color:var(--ink-3)}
+    .empty-state-icon{font-size:2.25rem;margin-bottom:0.75rem;opacity:0.35}
     .empty-state-text{font-size:0.875rem}
-    /* === Dashboard \u6697\u9ED1\u6A21\u5F0F\u4FEE\u590D === */
-    html.dark .stat-card {
-      background: #1f2937; /* \u6DF1\u8272\u5361\u7247\u80CC\u666F */
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-    }
-    html.dark .stat-card-header { color: #9ca3af; }
-    html.dark .stat-card-value { color: #f3f4f6; } /* \u767D\u8272\u6587\u5B57 */
-    html.dark .stat-card-subtitle { color: #6b7280; } 
-    html.dark .stat-card-trend.flat { background: #374151; color: #9ca3af; }
-    html.dark .stat-card-trend.up { background: rgba(16, 185, 129, 0.2); }
-    html.dark .stat-card-trend.down { background: rgba(239, 68, 68, 0.2); }
-    html.dark .list-item:hover { background: #374151; }
-    html.dark .list-item:not(:last-child) { border-bottom-color: #374151; }
-    html.dark .list-item-name { color: #f3f4f6; } /* \u5217\u8868\u9879\u540D\u79F0\u53D8\u767D */
-    html.dark .list-item-meta { color: #9ca3af; }
-    html.dark .list-item-badge { background: #3730a3; color: #c7d2fe; }
-    html.dark .ranking-item-name { color: #f3f4f6; } /* \u6392\u884C\u699C\u540D\u79F0\u53D8\u767D */
-    html.dark .ranking-item-amount { color: #e5e7eb; } /* \u91D1\u989D\u53D8\u767D */
-    html.dark .ranking-progress { background: #374151; }
-    /* \u4FEE\u590D\u53F3\u4E0A\u89D2\u7684\u6807\u7B7E */
-    html.dark .bg-indigo-100 { background-color: rgba(99, 102, 241, 0.2) !important; color: #a5b4fc !important; }
-    html.dark .text-indigo-800 { color: #c7d2fe !important; }
-    .loading-skeleton{background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 50%,#f3f4f6 75%);background-size:200% 100%;animation:loading 1.5s infinite;height:100px;border-radius:8px}
-    /* \u6697\u9ED1\u6A21\u5F0F\u9AA8\u67B6\u5C4F */
-    html.dark .loading-skeleton { background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%); }
+    .loading-skeleton{background:linear-gradient(90deg,var(--surface-2) 25%,var(--border) 50%,var(--surface-2) 75%);background-size:200% 100%;animation:loading 1.5s infinite;height:100px;border-radius:8px}
     @keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
   </style>
 </head>
 <body class="bg-gray-50">
-  <nav class="bg-white shadow-md relative z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center shrink-0">
-          <div class="flex items-center">
-            <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
-          </div>
-          <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
-        </div>
-        
-        <div class="hidden md:flex items-center space-x-4 ml-auto">
-          <a href="/admin/dashboard" class="text-indigo-600 border-b-2 border-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-chart-line mr-1"></i>\u4EEA\u8868\u76D8
-          </a>
-          <a href="/admin" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-list mr-1"></i>\u8BA2\u9605\u5217\u8868
-          </a>
-          <a href="/admin/notify-logs" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-history mr-1"></i>\u901A\u77E5\u5386\u53F2
-          </a>
-          <a href="/admin/config" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-cog mr-1"></i>\u7CFB\u7EDF\u914D\u7F6E
-          </a>
-          <a href="/api/logout" class="text-gray-700 hover:text-red-600 border-b-2 border-transparent hover:border-red-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-sign-out-alt mr-1"></i>\u9000\u51FA\u767B\u5F55
-          </a>
-        </div>
-
-        <div class="flex items-center md:hidden ml-auto">
-          <button id="mobile-menu-btn" type="button" aria-expanded="false" aria-label="\u5207\u6362\u5BFC\u822A\u83DC\u5355" class="text-gray-600 hover:text-indigo-600 focus:outline-none p-2 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-colors">
-            <i class="fas fa-bars text-xl"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-b border-gray-200 w-full">
-      <div class="px-4 pt-2 pb-4 space-y-2">
-        <div id="mobileTimeDisplay" class="px-3 py-2 text-xs text-indigo-600 text-right border-b border-gray-100 mb-2"></div>
-        <a href="/admin/dashboard" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-chart-line w-6 text-center mr-2"></i>\u4EEA\u8868\u76D8
-        </a>
-        <a href="/admin" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-list w-6 text-center mr-2"></i>\u8BA2\u9605\u5217\u8868
-        </a>
-        <a href="/admin/notify-logs" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-history w-6 text-center mr-2"></i>\u901A\u77E5\u5386\u53F2
-        </a>
-        <a href="/admin/config" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-cog w-6 text-center mr-2"></i>\u7CFB\u7EDF\u914D\u7F6E
-        </a>
-        <a href="/api/logout" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 active:bg-red-100 transition-colors">
-          <i class="fas fa-sign-out-alt w-6 text-center mr-2"></i>\u9000\u51FA\u767B\u5F55
-        </a>
-      </div>
-    </div>
-  </nav>
+  \${clientRuntime}
+  ${renderNav("config")}
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="mb-6">
-      <h2 class="text-2xl font-bold text-gray-800">\u{1F4CA} \u4EEA\u8868\u677F</h2>
+      <h2 class="text-2xl font-bold text-gray-800">\u4EEA\u8868\u677F</h2>
       <p class="text-sm text-gray-500 mt-1">\u8BA2\u9605\u8D39\u7528\u548C\u6D3B\u52A8\u6982\u89C8\uFF08\u7EDF\u8BA1\u91D1\u989D\u5DF2\u6298\u5408\u4E3A CNY\uFF09</p>
     </div>
 
@@ -12399,14 +12109,6 @@ var dashboardPage_default = `<!DOCTYPE html>
 
   <script>
     // \u7EDF\u4E00 API \u8BF7\u6C42\u5C01\u88C5\uFF1A401 \u81EA\u52A8\u8DF3\u8F6C\u767B\u5F55\u9875
-    async function apiFetch(url, options) {
-      const response = await fetch(url, options);
-      if (response.status === 401) {
-        window.location.href = '/';
-        throw new Error('AUTH_EXPIRED');
-      }
-      return response;
-    }
 
     // \u5B9A\u4E49\u8D27\u5E01\u7B26\u53F7\u6620\u5C04
     const currencySymbols = {
@@ -12581,7 +12283,7 @@ var dashboardPage_default = `<!DOCTYPE html>
               <div class="list-item-name">\${s.name}</div>
               <div class="list-item-meta">
                 <span><i class="fas fa-clock"></i> \${new Date(s.renewalDate).toLocaleDateString('zh-CN')}</span>
-                <span style="color:#f59e0b;font-weight:600">\${s.daysUntilRenewal} \u5929\u540E</span>
+                <span style="color:var(--warn);font-weight:600">\${s.daysUntilRenewal} \u5929\u540E</span>
                 \${s.customType?\`<span class="list-item-badge">\${s.customType}</span>\`:''}
               </div>
             </div>
@@ -12722,80 +12424,20 @@ var notifyLogsPage_default = `<!DOCTYPE html>
       #systemTimeDisplay { display: none !important; }
     }
     /* \u901A\u77E5\u5386\u53F2\u4E13\u7528\u6837\u5F0F */
-    .row-success { background-color: #f0fdf4; }
-    .row-failed  { background-color: #fef2f2; }
-    html.dark .row-success { background-color: rgba(34,197,94,0.08) !important; }
-    html.dark .row-failed  { background-color: rgba(239,68,68,0.08) !important; }
+    .row-success { background-color: var(--ok-bg); }
+    .row-failed  { background-color: var(--bad-bg); }
     .raw-pre { white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow: auto; }
     /* \u6982\u89C8\u5361\u7247 hover \u4E0E admin \u4E00\u81F4 */
-    .stat-card { background: #fff; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: transform 0.2s, box-shadow 0.2s; }
-    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
-    html.dark .stat-card { background: var(--dark-bg-secondary); }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }
+    html.dark .stat-card { background: var(--surface); }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
   <div id="toast-container"></div>
 
   <!-- \u4E0E admin / config / dashboard \u5B8C\u5168\u4E00\u81F4\u7684\u9876\u90E8\u5BFC\u822A -->
-  <nav class="bg-white shadow-md relative z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center shrink-0">
-          <div class="flex items-center">
-            <i class="fas fa-calendar-check text-indigo-600 text-2xl mr-2"></i>
-            <span class="font-bold text-xl text-gray-800">\u005A\u0051\u002D\u0054\u0072\u0061\u0063\u006B</span>
-          </div>
-          <span id="systemTimeDisplay" class="ml-4 text-base text-indigo-600 font-normal hidden md:block pt-1"></span>
-        </div>
-
-        <div class="hidden md:flex items-center space-x-4 ml-auto">
-          <a href="/admin/dashboard" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-chart-line mr-1"></i>\u4EEA\u8868\u76D8
-          </a>
-          <a href="/admin" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-list mr-1"></i>\u8BA2\u9605\u5217\u8868
-          </a>
-          <a href="/admin/notify-logs" class="text-indigo-600 border-b-2 border-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-history mr-1"></i>\u901A\u77E5\u5386\u53F2
-          </a>
-          <a href="/admin/config" class="text-gray-700 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-cog mr-1"></i>\u7CFB\u7EDF\u914D\u7F6E
-          </a>
-          <a href="/api/logout" class="text-gray-700 hover:text-red-600 border-b-2 border-transparent hover:border-red-300 px-3 py-2 rounded-md text-sm font-medium transition">
-            <i class="fas fa-sign-out-alt mr-1"></i>\u9000\u51FA\u767B\u5F55
-          </a>
-        </div>
-
-        <div class="flex items-center md:hidden ml-auto">
-          <button id="mobile-menu-btn" type="button" aria-expanded="false" aria-label="\u5207\u6362\u5BFC\u822A\u83DC\u5355"
-            class="text-gray-600 hover:text-indigo-600 focus:outline-none p-2 rounded-md hover:bg-gray-100 active:bg-gray-200 transition-colors">
-            <i class="fas fa-bars text-xl"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-b border-gray-200 w-full">
-      <div class="px-4 pt-2 pb-4 space-y-2">
-        <div id="mobileTimeDisplay" class="px-3 py-2 text-xs text-indigo-600 text-right border-b border-gray-100 mb-2"></div>
-        <a href="/admin/dashboard" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-chart-line w-6 text-center mr-2"></i>\u4EEA\u8868\u76D8
-        </a>
-        <a href="/admin" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-list w-6 text-center mr-2"></i>\u8BA2\u9605\u5217\u8868
-        </a>
-        <a href="/admin/notify-logs" class="block px-3 py-3 rounded-md text-base font-medium text-indigo-600 bg-indigo-50">
-          <i class="fas fa-history w-6 text-center mr-2"></i>\u901A\u77E5\u5386\u53F2
-        </a>
-        <a href="/admin/config" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 active:bg-indigo-100 transition-colors">
-          <i class="fas fa-cog w-6 text-center mr-2"></i>\u7CFB\u7EDF\u914D\u7F6E
-        </a>
-        <a href="/api/logout" class="block px-3 py-3 rounded-md text-base font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 active:bg-red-100 transition-colors">
-          <i class="fas fa-sign-out-alt w-6 text-center mr-2"></i>\u9000\u51FA\u767B\u5F55
-        </a>
-      </div>
-    </div>
-  </nav>
+  \${clientRuntime}
+  ${renderNav("config")}
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- \u9875\u9762\u5934\u90E8\uFF08\u4E0E\u8BA2\u9605\u5217\u8868\u7684 h2 + subtitle \u6A21\u5F0F\u4E00\u81F4\uFF09 -->
@@ -12953,11 +12595,6 @@ var notifyLogsPage_default = `<!DOCTYPE html>
       return '<span class="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-medium">' + s + '</span>';
     }
 
-    function escapeHtml(s) {
-      return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
 
     function buildDetail(log) {
       const parts = [];
@@ -13186,7 +12823,9 @@ var notifyLogsPage_default = `<!DOCTYPE html>
 
 // src/views/pages.js
 function injectTheme(html) {
-  return html.replace(/\$\{themeResources\}/g, theme_resources_default);
+  return html
+    .replace(/\$\{themeResources\}/g, theme_resources_default)
+    .replace(/\$\{clientRuntime\}/g, client_runtime_default);
 }
 var loginPage = injectTheme(loginPage_default);
 var adminPage = injectTheme(adminPage_default);
@@ -13201,37 +12840,25 @@ async function handleAdminRequest(request, env) {
   try {
     const url = new URL(request.url);
     const pathname = url.pathname;
-    console.log("[\u7BA1\u7406\u9875\u9762] \u8BBF\u95EE\u8DEF\u5F84:", pathname);
     const token = getCookieValue(request.headers.get("Cookie"), "token");
-    console.log("[\u7BA1\u7406\u9875\u9762] Token\u5B58\u5728:", !!token);
     const config = await getConfig(env);
     const user = token ? await verifyJWT(token, config.JWT_SECRET) : null;
-    console.log("[\u7BA1\u7406\u9875\u9762] \u7528\u6237\u9A8C\u8BC1\u7ED3\u679C:", !!user);
     if (!user) {
-      console.log("[\u7BA1\u7406\u9875\u9762] \u7528\u6237\u672A\u767B\u5F55\uFF0C\u91CD\u5B9A\u5411\u5230\u767B\u5F55\u9875\u9762");
       return new Response("", {
         status: 302,
         headers: { "Location": "/" }
       });
     }
     if (pathname === "/admin/config") {
-      return new Response(configPage, {
-        headers: { "Content-Type": "text/html; charset=utf-8" }
-      });
+      return htmlResponse(configPage);
     }
     if (pathname === "/admin/dashboard") {
-      return new Response(dashboardPage(), {
-        headers: { "Content-Type": "text/html; charset=utf-8" }
-      });
+      return htmlResponse(dashboardPage());
     }
     if (pathname === "/admin/notify-logs") {
-      return new Response(notifyLogsPage, {
-        headers: { "Content-Type": "text/html; charset=utf-8" }
-      });
+      return htmlResponse(notifyLogsPage);
     }
-    return new Response(adminPage, {
-      headers: { "Content-Type": "text/html; charset=utf-8" }
-    });
+    return htmlResponse(adminPage);
   } catch (error) {
     console.error("[\u7BA1\u7406\u9875\u9762] \u5904\u7406\u8BF7\u6C42\u65F6\u51FA\u9519:", error);
     return new Response("\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", {
@@ -13241,9 +12868,7 @@ async function handleAdminRequest(request, env) {
   }
 }
 function handleLoginPage() {
-  return new Response(loginPage, {
-    headers: { "Content-Type": "text/html; charset=utf-8" }
-  });
+  return htmlResponse(loginPage);
 }
 
 // src/api/debug.js
@@ -13598,11 +13223,11 @@ var apiClientCode = `/**
 // 之前只挂了 img.520jk.cc.cd 上的外链 SVG：图床挂了/被墙、或浏览器不支持 SVG 图标（Safari）时，
 // 标签页就什么都不显示。这里改成同源提供 ICO(16/32/48) + SVG + apple-touch-icon 三件套。
 // 图形与原 SVG 一致，已栅格化。
-var ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle fill="#667eea" cx="32" cy="32" r="32"/><rect x="16" y="28" width="32" height="20" rx="4" fill="#fff"/><rect x="24" y="20" width="16" height="8" rx="2" fill="#fff"/><rect x="28" y="36" width="8" height="8" rx="2" fill="#667eea"/></svg>`;
+var ICON_SVG = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g transform=\"translate(7.5 4) scale(0.109375)\" fill=\"#1b1b19\"><path d=\"M160 32V64H288V32C288 14.33 302.3 0 320 0C337.7 0 352 14.33 352 32V64H400C426.5 64 448 85.49 448 112V160H0V112C0 85.49 21.49 64 48 64H96V32C96 14.33 110.3 0 128 0C145.7 0 160 14.33 160 32zM0 192H448V464C448 490.5 426.5 512 400 512H48C21.49 512 0 490.5 0 464V192zM328.1 304.1C338.3 295.6 338.3 280.4 328.1 271C319.6 261.7 304.4 261.7 295 271L200 366.1L152.1 319C143.6 309.7 128.4 309.7 119 319C109.7 328.4 109.7 343.6 119 352.1L183 416.1C192.4 426.3 207.6 426.3 216.1 416.1L328.1 304.1z\"/></g></svg>";
 
-var ICON_ICO_B64 = "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";
+var ICON_ICO_B64 = "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";
 
-var ICON_APPLE_B64 = "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";
+var ICON_APPLE_B64 = "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";
 
 function base64ToBytes(b64) {
   var bin = atob(b64);
